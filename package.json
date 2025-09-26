@@ -6,7 +6,13 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "format": "prettier -w .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx}": "eslint --fix",
+    "*.{js,ts,tsx,css,md,json}": "prettier --write"
   },
   "dependencies": {
     "next": "15.5.4",
@@ -28,7 +34,10 @@
     "eslint-config-next": "15.5.4",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.1",
     "postcss": "^8.5.6",
+    "prettier": "^3.3.3",
     "tailwindcss": "^4.1.13",
     "typescript": "^5",
     "typescript-eslint": "^8.44.1"
