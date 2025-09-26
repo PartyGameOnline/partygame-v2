@@ -1,31 +1,41 @@
-// eslint.config.mjs ーー Flat Config + 互換レイヤーで next/core-web-vitals を利用
-import { FlatCompat } from "@eslint/eslintrc";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// 互換レイヤー: 旧 .eslintrc 形式の "extends" を Flat Config で使えるようにする
-const compat = new FlatCompat({ baseDirectory: __dirname });
+// eslint.config.mjs
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+import reactPlugin from "eslint-plugin-react";
+import nextPlugin from "@next/eslint-plugin-next";
+import prettier from "eslint-config-prettier";
 
 export default [
-  // Next.js 推奨ルール（core-web-vitals）を取り込む
-  ...compat.config({ extends: ["next/core-web-vitals"] }),
+  // JS の基本推奨
+  js.configs.recommended,
 
-  // 無視パターン
-  {
-    ignores: [".next/**", "node_modules/**", "dist/**"],
-  },
+  // TypeScript の推奨
+  ...tseslint.configs.recommended,
 
-  // 追加ルールや共通設定
+  // TS/TSX 用のパーサー設定（←今回の肝）
   {
-    files: ["**/*.{js,jsx,ts,tsx}"],
+    files: ["**/*.{ts,tsx,js,jsx}"],
     languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: "module",
+      parser: tseslint.parser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        ecmaFeatures: { jsx: true }, // JSX を有効化
+        // 必要に応じて次の2行を有効化（型情報を使うルールを有効にしたい場合）
+        // projectService: true,
+        // tsconfigRootDir: new URL('.', import.meta.url).pathname,
+      },
+    },
+    plugins: {
+      react: reactPlugin,
+      "@next/next": nextPlugin,
     },
     rules: {
-      // 例: 未使用変数は _ 始まりだけ許可
-      "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      // Next.js 13+ では不要
+      "react/react-in-jsx-scope": "off",
     },
   },
+
+  // Prettier で最終整形（競合ルールを無効に）
+  prettier,
 ];
