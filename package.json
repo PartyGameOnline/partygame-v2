@@ -6,12 +6,11 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint --max-warnings=0 --config eslint.config.mjs .",
-    "format": "prettier -w .",
+    "lint": "eslint",
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{js,ts,tsx}": "eslint --fix --ext .js,.ts,.tsx",
+    "*.{js,ts,tsx}": "eslint --fix",
     "*.{js,ts,tsx,css,md,json}": "prettier --write"
   },
   "dependencies": {
@@ -20,27 +19,30 @@
     "react-dom": "19.1.0"
   },
   "devDependencies": {
-    "@eslint/css": "0.11.1",
-    "@eslint/eslintrc": "3",
-    "@eslint/js": "9.36.0",
-    "@eslint/json": "0.13.2",
-    "@eslint/markdown": "7.3.0",
-    "@tailwindcss/postcss": "4",
-    "@types/node": "20",
-    "@types/react": "19",
-    "@types/react-dom": "19",
-    "autoprefixer": "10.4.21",
-    "eslint": "9.36.0",
+    "@eslint/css": "^0.11.1",
+    "@eslint/eslintrc": "^3",
+    "@eslint/js": "^9.36.0",
+    "@eslint/json": "^0.13.2",
+    "@eslint/markdown": "^7.3.0",
+    "@next/eslint-plugin-next": "15.5.4",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@typescript-eslint/eslint-plugin": "8.44.1",
+    "@typescript-eslint/parser": "8.44.1",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.36.0",
     "eslint-config-next": "15.5.4",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react": "7.37.5",
-    "globals": "16.4.0",
-    "husky": "9.1.7",
-    "lint-staged": "16.2.1",
-    "postcss": "8.5.6",
+    "globals": "^16.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.1",
+    "postcss": "^8.5.6",
     "prettier": "3.6.2",
-    "tailwindcss": "4.1.13",
-    "typescript": "5",
-    "typescript-eslint": "8.44.1"
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5",
+    "typescript-eslint": "^8.44.1"
   }
 }
