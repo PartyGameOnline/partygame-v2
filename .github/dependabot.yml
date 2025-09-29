@@ -3,7 +3,17 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps"
+      interval: "daily"          # 毎日
+      time: "06:00"              # UTC（= 日本時間 15:00）
+    open-pull-requests-limit: 10
+    versioning-strategy: increase # ^1.2.3 → 1.3.0 などに上げやすく
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+      dev-deps:
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier*"
+          - "husky"
+          - "lint-staged"
