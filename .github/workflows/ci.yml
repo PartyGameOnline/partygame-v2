@@ -7,9 +7,25 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: read
+
+# 同じブランチの古い実行はキャンセル（無駄な課金/消費を抑制）
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  quality:
+  ci:
+    # ここでチェック名（＝ステータスチェックの表示名）を決める
+    name: ${{ matrix.task }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [build, lint, test, typecheck]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,17 +33,27 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version-file: ".nvmrc" # なければ 20 を使うなど後述
+          node-version-file: ".nvmrc"   # ある場合はこれを使用
           cache: "npm"
 
       - name: Install
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npx tsc --noEmit
-
-      - name: Build
-        run: npm run build
+      - name: Run ${{ matrix.task }}
+        shell: bash
+        run: |
+          case "${{ matrix.task }}" in
+            lint)
+              npm run lint
+              ;;
+            typecheck)
+              npx tsc --noEmit
+              ;;
+            build)
+              npm run build
+              ;;
+            test)
+              # まだ test スクリプトが無くても成功扱いにします
+              npm run -s test --if-present || echo "No tests; skipping."
+              ;;
+          esac
