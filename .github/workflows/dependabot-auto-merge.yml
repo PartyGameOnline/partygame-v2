@@ -69,12 +69,10 @@ jobs:
               repo: context.repo.repo,
               pull_number: pr.number,
             });
-
             if (data.merged) {
               core.info(`PR #${pr.number} already merged ✅`);
               return;
             }
-
             try {
               await github.rest.pulls.merge({
                 owner: context.repo.owner,
