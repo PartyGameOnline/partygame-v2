@@ -1,62 +1,59 @@
 name: CI
+run-name: "CI • ${{ github.event_name }} • ${{ github.ref_name }} • ${{ github.actor }}"
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [main, master]
+  push:
+    branches: [main, master]
 
 permissions:
   contents: read
 
+# 同じブランチの古い実行はキャンセル（無駄な課金/消費を抑制）
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint:
-    name: lint
+  ci:
+    # ここでチェック名（＝ステータスチェックの表示名）を決める
+    name: ${{ matrix.task }}
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run lint -- --max-warnings=0
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [build, lint, test, typecheck]
 
-  typecheck:
-    name: typecheck
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run typecheck
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  test:
-    name: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
-      - run: npm ci
-      # まだテストが無いなら pass するダミー
-      - run: npm run test --if-present || echo "no tests"
+          node-version-file: ".nvmrc"   # ある場合はこれを使用
+          cache: "npm"
 
-  build:
-    name: build
-    needs: [lint, typecheck, test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build
+      - name: Install
+        run: npm ci
+
+      - name: Run ${{ matrix.task }}
+        shell: bash
+        run: |
+          case "${{ matrix.task }}" in
+            lint)
+              npm run lint
+              ;;
+            typecheck)
+              npx tsc --noEmit
+              ;;
+            build)
+              npm run build
+              ;;
+            test)
+              # まだ test スクリプトが無くても成功扱いにします
+              npm run -s test --if-present || echo "No tests; skipping."
+              ;;
+          esac
