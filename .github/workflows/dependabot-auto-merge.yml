@@ -45,7 +45,6 @@ jobs:
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash
 
       # 3) 必須チェックが success になるまで待機（この WF 自身は除外）
