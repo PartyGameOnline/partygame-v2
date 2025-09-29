@@ -4,7 +4,6 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
 
-# GITHUB_TOKEN の既定権限を上書き（このワークフロー限定）
 permissions:
   contents: write
   pull-requests: write
@@ -14,13 +13,8 @@ jobs:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Convert draft to ready (Dependabot)
-        uses: peter-evans/convert-draft-to-ready@v2
+      - name: Auto-merge Dependabot PRs (minor/patch only)
+        uses: fastify/github-action-merge-dependabot@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Enable auto-merge (squash)
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          merge-method: squash
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          target: minor
