@@ -1,7 +1,6 @@
 version: 2
 updates:
   # npm（アプリ本体）
-  # npm（アプリ本体）
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -36,14 +35,26 @@ updates:
       interval: "daily"          # 毎日
       time: "06:00"              # UTC（= 日本時間 15:00）
     open-pull-requests-limit: 10
-    versioning-strategy: increase # ^1.2.3 → 1.3.0 などに上げやすく
-    groups:
-      minor-and-patch:
-        update-types: ["minor", "patch"]
-      dev-deps:
-        patterns:
-          - "@types/*"
-          - "eslint*"
-          - "prettier*"
-          - "husky"
-          - "lint-staged"
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "deps(npm)"
+    # 大型アップデートは様子見（必要になれば外せます）
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions（CI用Actionの更新）
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:30"
+      timezone: "Asia/Tokyo"
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "deps(actions)"
