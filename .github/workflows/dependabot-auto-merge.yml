@@ -3,33 +3,24 @@ name: dependabot-auto-merge
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
-    branches: [ main, master ]
 
+# GITHUB_TOKEN の既定権限を上書き（このワークフロー限定）
 permissions:
-  contents: write          # マージに必要
+  contents: write
   pull-requests: write
 
 jobs:
   automerge:
-    if: ${{ github.actor == 'dependabot[bot]' }}   # Dependabot PRのみ対象
+    if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch metadata
-        id: metadata
-        uses: dependabot/fetch-metadata@v2
-
-      # major アップデートは除外（手動確認用）
-      - name: Enable auto-merge (non-major only)
-        if: ${{ steps.metadata.outputs.update-type != 'version-update:semver-major' }}
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ github.event.pull_request.number }}
-          merge-method: squash
-
-      # 依存PRが「ドラフト」なら解除（たまにドラフトで来る対策）
-      - name: Mark ready for review
-        if: ${{ github.event.pull_request.draft == true }}
+      - name: Convert draft to ready (Dependabot)
         uses: peter-evans/convert-draft-to-ready@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge (squash)
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          merge-method: squash
