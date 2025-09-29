@@ -20,13 +20,19 @@ jobs:
       github.actor == 'dependabot[bot]' ||
       (github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
-
     steps:
       # 0) ブランチ保護の「承認必須」対策として自動承認
       - name: Auto-approve Dependabot PR
         uses: hmarr/auto-approve-action@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 0.5) PR が Draft の場合は Ready に切り替える（convert-draft-to-ready の代替）
+      - name: Mark PR ready (if draft)
+        if: ${{ github.event.pull_request.draft == true }}
+        run: gh pr ready ${{ github.event.pull_request.number }} -R "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 1) GitHub の Auto-merge を有効化（squash）
       - name: Enable auto-merge

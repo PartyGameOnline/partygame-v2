@@ -4,12 +4,21 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"    # 毎日
+      time: "06:00"        # UTC（= 日本時間 15:00）
+    open-pull-requests-limit: 10
+    versioning-strategy: increase # ^1.2.3 -> 1.3.0 などにアップデート
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    dev-deps:
+      patterns:
+        - "@types/*"
+        - "eslint*"
 
-  # GitHub Actions（CI）
+  # GitHub Actions (CI)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     commit-message:
-      prefix: "deps(actions)"
