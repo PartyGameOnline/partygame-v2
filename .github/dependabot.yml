@@ -1,6 +1,7 @@
 version: 2
 updates:
   # npm（アプリ本体）
+  # npm（アプリ本体）
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
