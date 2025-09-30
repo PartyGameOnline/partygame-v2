@@ -6,7 +6,7 @@ on:
     branches: [main, master]
     types: [opened, reopened, synchronize, labeled, ready_for_review]
 
-# 自動マージに必要な権限
+# 自動マージに必要な権限（リポジトリ設定が read-only でもここで上書き）
 permissions:
   contents: write
   pull-requests: write
@@ -18,7 +18,7 @@ jobs:
     # Dependabot が作成した PR のみ対象
     if: >
       github.actor == 'dependabot[bot]' ||
-      (github.event.pull_request.user.login == 'dependabot[bot]')
+      github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       # 0) ブランチ保護の「承認必須」対策として自動承認
