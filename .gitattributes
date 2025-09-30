@@ -1,0 +1,13 @@
+* text=auto eol=lf
+
+# 画像やバイナリはテキストマージしない
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.ico binary
+
+# ロックファイルは“ours”を優先（CIで再生成する前提）
+package-lock.json merge=ours

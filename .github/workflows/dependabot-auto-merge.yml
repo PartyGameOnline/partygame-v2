@@ -1,8 +1,8 @@
 name: dependabot-auto-merge
 
 on:
+  # main 向けの Dependabot PR で発火
   pull_request:
-    # main 向けの Dependabot PR で発火
     branches: [main]
     types: [opened, reopened, synchronize, labeled, ready_for_review]
 
@@ -10,6 +10,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  checks: read
+  actions: read
 
 jobs:
   automerge:
@@ -57,12 +59,10 @@ jobs:
               repo: context.repo.repo,
               pull_number: pr.number,
             });
-
             if (data.merged) {
               core.info(`PR #${pr.number} already merged ✅`);
               return;
             }
-
             try {
               await github.rest.pulls.merge({
                 owner: context.repo.owner,
