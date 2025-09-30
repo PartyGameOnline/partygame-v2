@@ -29,6 +29,13 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # 0.5) PR がドラフトなら Ready に切り替え（存在しない Action の代替）
+      - name: Mark PR ready (if draft)
+        if: ${{ github.event.pull_request.draft == true }}
+        run: gh pr ready ${{ github.event.pull_request.number }} -R "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # 1) GitHub の Auto-merge を有効化（squash）
       - name: Enable auto-merge
         uses: peter-evans/enable-pull-request-automerge@v3
