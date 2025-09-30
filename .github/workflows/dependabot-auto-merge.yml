@@ -1,9 +1,8 @@
-# .github/workflows/dependabot-auto-merge.yml
 name: dependabot-auto-merge
 
 on:
-  # Dependabot が作る PR に対して発火
   pull_request:
+    # main 向けの Dependabot PR で発火
     branches: [main]
     types: [opened, reopened, synchronize, labeled, ready_for_review]
 
@@ -14,13 +13,14 @@ permissions:
 
 jobs:
   automerge:
-    # Dependabot が作った PR のときだけ動く
+    # Dependabot が作成した PR のみ対象
     if: >
       github.actor == 'dependabot[bot]' ||
       (github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
+
     steps:
-      # 0) ブランチ保護に対応するため自動承認
+      # 0) ブランチ保護の「承認必須」対策として自動承認
       - name: Auto-approve Dependabot PR
         uses: hmarr/auto-approve-action@v3
         with:
@@ -34,7 +34,7 @@ jobs:
           pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash
 
-      # 2) すべての必須チェックが success になるまで待つ（この WF 自身は除外）
+      # 2) 必須チェックが success になるまで待機（この WF 自身は除外）
       - name: Wait for required checks
         uses: lewagon/wait-on-check-action@v1.3.2
         with:
@@ -57,10 +57,12 @@ jobs:
               repo: context.repo.repo,
               pull_number: pr.number,
             });
+
             if (data.merged) {
               core.info(`PR #${pr.number} already merged ✅`);
               return;
             }
+
             try {
               await github.rest.pulls.merge({
                 owner: context.repo.owner,
