@@ -1,39 +1,41 @@
 name: dependabot-auto-merge
 
 on:
-  # Dependabot が作る PR に対して発火
+  # Dependabot が作る PR に対して実行（main への PR）
   pull_request:
     branches: [main]
     types: [opened, reopened, synchronize, labeled, ready_for_review]
 
-# 自動マージに必要な権限
+# 自動マージに必要な権限（リポジトリ設定が read-only でもここで上書き）
 permissions:
   contents: write
   pull-requests: write
+  checks: read
+  actions: read
 
 jobs:
   automerge:
-    # Dependabot が作った PR のときだけ動く
+    # Dependabot が作った PR のときだけ動作
     if: >
       github.actor == 'dependabot[bot]' ||
-      (github.event.pull_request.user.login == 'dependabot[bot]')
+      github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      # 0) Dependabot PR を自動承認（ブランチ保護で承認必須のため）
+      # 0) ブランチ保護で「レビュー必須」の場合に備えて自動承認
       - name: Auto-approve Dependabot PR
         uses: hmarr/auto-approve-action@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 1) Auto-merge を有効化（squash）
-      - name: Enable auto-merge
+      # 1) 自動マージ（squash）を有効化
+      - name: Enable auto-merge (squash)
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash
 
-      # 2) すべての必須チェックが success になるまで待つ（このワークフロー自身は除外）
+      # 2) 必須チェックが全部 success になるまで待機
       - name: Wait for required checks
         uses: lewagon/wait-on-check-action@v1.3.2
         with:
