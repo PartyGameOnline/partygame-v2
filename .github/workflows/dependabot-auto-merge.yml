@@ -25,7 +25,7 @@ jobs:
     steps:
       # 0) ブランチ保護の「承認必須」対策として自動承認
       - name: Auto-approve Dependabot PR
-        uses: hmarr/auto-approve-action@v3
+        uses: hmarr/auto-approve-action@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -46,7 +46,7 @@ jobs:
 
       # 2) 必須チェックが success になるまで待機（この WF 自身は除外）
       - name: Wait for required checks
-        uses: lewagon/wait-on-check-action@v1.3.2
+        uses: lewagon/wait-on-check-action@v1.4.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -57,7 +57,7 @@ jobs:
       # 3) フォールバック：未マージなら API で squash merge
       - name: Merge when green (fallback)
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
