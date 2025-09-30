@@ -1,15 +1,35 @@
 version: 2
 updates:
   # npm（アプリ本体）
+  # npm（アプリ本体）
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "weekly"          # 週1回
+      day: "monday"
+      time: "10:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "deps(npm)"
+    # 大型アップデートは様子見（必要になれば外せます）
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
 
-  # GitHub Actions（CI）
+  # GitHub Actions（CI用Actionの更新）
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "10:30"
+      timezone: "Asia/Tokyo"
+    labels: ["dependencies"]
     commit-message:
       prefix: "deps(actions)"
