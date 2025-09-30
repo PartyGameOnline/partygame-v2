@@ -1,10 +1,9 @@
-# .github/workflows/dependabot-auto-merge.yml
 name: dependabot-auto-merge
 
 on:
-  # main 向けの Dependabot PR で発火
+  # Dependabot が作る PR に対して実行（main / master 向け）
   pull_request:
-    branches: [main]
+    branches: [main, master]
     types: [opened, reopened, synchronize, labeled, ready_for_review]
 
 # 自動マージに必要な権限
@@ -21,32 +20,37 @@ jobs:
       github.actor == 'dependabot[bot]' ||
       (github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
-
     steps:
       # 0) ブランチ保護の「承認必須」対策として自動承認
       - name: Auto-approve Dependabot PR
-        uses: hmarr/auto-approve-action@v4
+        uses: hmarr/auto-approve-action@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 0.5) PR がドラフトなら Ready に切り替え（存在しない Action の代替）
+      # 0.5) PR がドラフトなら Ready に切り替え（Actionの代替として gh CLI を使用）
       - name: Mark PR ready (if draft)
         if: ${{ github.event.pull_request.draft == true }}
         run: gh pr ready ${{ github.event.pull_request.number }} -R "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 1) GitHub の Auto-merge を有効化（squash）
-      - name: Enable auto-merge
+      # 1) Dependabot メタデータ取得（更新種別の判定用）
+      - name: Fetch metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+
+      # 2) メジャーアップデート以外は GitHub の Auto-merge を有効化（squash）
+      - name: Enable auto-merge (non-major only)
+        if: ${{ steps.metadata.outputs.update-type != 'version-update:semver-major' }}
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash
 
-      # 2) 必須チェックが success になるまで待機（この WF 自身は除外）
+      # 3) 必須チェックが success になるまで待機（この WF 自身は除外）
       - name: Wait for required checks
-        uses: lewagon/wait-on-check-action@v1.4.1
+        uses: lewagon/wait-on-check-action@v1.3.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -54,10 +58,10 @@ jobs:
           wait-interval: 10
           allowed-conclusions: success
 
-      # 3) フォールバック：未マージなら API で squash merge
+      # 4) フォールバック：未マージなら API で squash merge
       - name: Merge when green (fallback)
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
