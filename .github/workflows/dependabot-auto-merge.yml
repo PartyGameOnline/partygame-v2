@@ -1,4 +1,3 @@
-# .github/workflows/dependabot-auto-merge.yml
 name: dependabot-auto-merge
 
 on:
@@ -21,7 +20,6 @@ jobs:
       github.actor == 'dependabot[bot]' ||
       (github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
-
     steps:
       # 0) ブランチ保護の「承認必須」対策として自動承認
       - name: Auto-approve Dependabot PR
