@@ -1,7 +1,7 @@
 name: dependabot-auto-merge
 
 on:
-  # Dependabot が作る PR に対して発火（イベントをユニオン）
+  # Dependabot が作る PR に対して発火
   pull_request:
     branches: [main]
     types: [opened, reopened, synchronize, labeled, ready_for_review]
@@ -13,11 +13,19 @@ permissions:
 
 jobs:
   automerge:
-    # Dependabot の PR のみ対象
-    if: github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]'
+    # Dependabot が作った PR のときだけ動く
+    if: >
+      github.actor == 'dependabot[bot]' ||
+      (github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
-      # 1) Auto-merge を有効化（GitHub の自動マージフラグを立てる）
+      # 0) Dependabot PR を自動承認（ブランチ保護で承認必須のため）
+      - name: Auto-approve Dependabot PR
+        uses: hmarr/auto-approve-action@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 1) Auto-merge を有効化（squash）
       - name: Enable auto-merge
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
@@ -25,8 +33,8 @@ jobs:
           pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash
 
-      # 2) すべての必須チェックが success になるまで待機
-      - name: Wait for all required checks to pass
+      # 2) すべての必須チェックが success になるまで待つ（このワークフロー自身は除外）
+      - name: Wait for required checks
         uses: lewagon/wait-on-check-action@v1.3.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -35,26 +43,31 @@ jobs:
           wait-interval: 10
           allowed-conclusions: success
 
-      # 3) フォールバック：未マージなら手動で squash merge を実行
+      # 3) フォールバック：まだ未マージなら API で squash merge
       - name: Merge when green (fallback)
+        if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const pr = context.payload.pull_request;
-            const { data: prData } = await github.rest.pulls.get({
+            const { data } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pr.number,
             });
-            if (prData.merged) {
-              core.info(`PR #${pr.number} already merged.`);
-            } else {
+            if (data.merged) {
+              core.info(`PR #${pr.number} already merged ✅`);
+              return;
+            }
+            try {
               await github.rest.pulls.merge({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: pr.number,
                 merge_method: 'squash',
               });
-              core.info(`PR #${pr.number} merged.`);
+              core.info(`PR #${pr.number} merged via API ✅`);
+            } catch (e) {
+              core.warning(`Fallback merge failed: ${e.message}`);
             }
