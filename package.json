@@ -10,10 +10,10 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint . --max-warnings=0",
     "prepare": "husky",
-    "typecheck": "tsc --noEmit",
-    "test": "echo \"no tests\""
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"no tests yet\" && exit 0"
   },
   "lint-staged": {
     "*.{js,ts,tsx}": "eslint --fix",
