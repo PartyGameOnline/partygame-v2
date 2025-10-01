@@ -1,10 +1,11 @@
 version: 2
 updates:
-  # アプリ（npm）
+  # npm（アプリ本体）
+  # npm（アプリ本体）
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"      # 週1回
+      interval: "weekly"          # 週1回
       day: "monday"
       time: "10:00"
       timezone: "Asia/Tokyo"
@@ -12,7 +13,7 @@ updates:
     labels: ["dependencies"]
     commit-message:
       prefix: "deps(npm)"
-    # メジャーは様子見（必要なら外せます）
+    # 大型アップデートは様子見（必要になれば外せます）
     ignore:
       - dependency-name: "next"
         update-types: ["version-update:semver-major"]
@@ -21,7 +22,7 @@ updates:
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
 
-  # GitHub Actions（CI）
+  # GitHub Actions（CI用Actionの更新）
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
