@@ -5,6 +5,7 @@
     "url": "https://github.com/PartyGameOnline/partygame-v2.git"
   },
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -13,7 +14,9 @@
     "lint": "eslint . --max-warnings=0",
     "prepare": "husky",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"no tests yet\" && exit 0"
+    "test": "echo \"no tests yet\" && exit 0",
+    "licenses:summary": "license-checker-rseidelsohn --production --summary",
+    "licenses:csv": "license-checker-rseidelsohn --production --csv --out licenses.csv"
   },
   "lint-staged": {
     "*.{js,ts,tsx}": "eslint --fix",
@@ -49,6 +52,7 @@
     "prettier": "3.6.2",
     "tailwindcss": "^4.1.13",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.45.0"
+    "typescript-eslint": "8.45.0",
+    "license-checker-rseidelsohn": "4.4.2"
   }
 }
