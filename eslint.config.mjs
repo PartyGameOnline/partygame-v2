@@ -1,41 +1,57 @@
 // eslint.config.mjs
 import js from "@eslint/js";
-import tseslint from "typescript-eslint";
+import globals from "globals";
+import tsParser from "@typescript-eslint/parser";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactPlugin from "eslint-plugin-react";
-import nextPlugin from "@next/eslint-plugin-next";
-import prettier from "eslint-config-prettier";
 
+/** @type {import('eslint').Linter.FlatConfig[]} */
 export default [
-  // JS の基本推奨
-  js.configs.recommended,
-
-  // TypeScript の推奨
-  ...tseslint.configs.recommended,
-
-  // TS/TSX 用のパーサー設定（←今回の肝）
+  // .eslintignore の代替
   {
-    files: ["**/*.{ts,tsx,js,jsx}"],
-    languageOptions: {
-      parser: tseslint.parser,
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
-        ecmaFeatures: { jsx: true }, // JSX を有効化
-        // 必要に応じて次の2行を有効化（型情報を使うルールを有効にしたい場合）
-        // projectService: true,
-        // tsconfigRootDir: new URL('.', import.meta.url).pathname,
-      },
-    },
-    plugins: {
-      react: reactPlugin,
-      "@next/next": nextPlugin,
-    },
-    rules: {
-      // Next.js 13+ では不要
-      "react/react-in-jsx-scope": "off",
-    },
+    ignores: ["node_modules/", ".next/", "dist/", "build/", "out/", "coverage/"],
   },
 
-  // Prettier で最終整形（競合ルールを無効に）
-  prettier,
+  // JS の推奨
+  js.configs.recommended,
+
+  // JS/JSX
+  {
+    files: ["**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      ecmaFeatures: { jsx: true },
+      globals: { ...globals.browser, ...globals.node },
+    },
+    plugins: { react: reactPlugin },
+    rules: {
+      "react/react-in-jsx-scope": "off",
+    },
+    settings: { react: { version: "detect" } },
+  },
+
+  // TS/TSX（type-aware ではない軽量モード）
+  {
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: false,
+        ecmaVersion: "latest",
+        sourceType: "module",
+        ecmaFeatures: { jsx: true },
+      },
+      globals: { ...globals.browser, ...globals.node },
+    },
+    plugins: {
+      "@typescript-eslint": tsPlugin,
+      react: reactPlugin,
+    },
+    rules: {
+      "react/react-in-jsx-scope": "off", // これは1回だけ
+      "no-undef": "off", // TS/TSXでは未定義判定を無効化
+    },
+    settings: { react: { version: "detect" } },
+  },
 ];

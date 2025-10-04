@@ -1,4 +1,5 @@
 name: CI
+run-name: "CI • ${{ github.event_name }} • ${{ github.ref_name }} • ${{ github.actor }}"
 
 on:
   pull_request:
@@ -6,27 +7,43 @@ on:
   push:
     branches: [main, master]
 
+# 同じブランチの古い実行はキャンセル（無駄な課金/消費を抑制）
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  quality:
+  ci:
     runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [build, lint, test, typecheck]
+
+    # ← strategy の後に name を置く
+    name: ${{ matrix.task }}
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v5
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version-file: ".nvmrc" # なければ 20 を使うなど後述
+          node-version-file: ".nvmrc"
           cache: "npm"
-
       - name: Install
         run: npm ci
-
       - name: Lint
+        if: ${{ matrix.task == 'lint' }}
         run: npm run lint
-
       - name: Typecheck
+        if: ${{ matrix.task == 'typecheck' }}
         run: npx tsc --noEmit
-
+      - name: Test
+        if: ${{ matrix.task == 'test' }}
+        run: npm test --if-present
       - name: Build
+        if: ${{ matrix.task == 'build' }}
         run: npm run build
