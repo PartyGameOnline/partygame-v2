@@ -5,15 +5,18 @@
     "url": "https://github.com/PartyGameOnline/partygame-v2.git"
   },
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint . --max-warnings=0",
     "prepare": "husky",
-    "typecheck": "tsc --noEmit",
-    "test": "echo \"no tests\""
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"no tests yet\" && exit 0",
+    "licenses:summary": "license-checker-rseidelsohn --production --summary",
+    "licenses:csv": "license-checker-rseidelsohn --production --csv --out licenses.csv"
   },
   "lint-staged": {
     "*.{js,ts,tsx}": "eslint --fix",
@@ -21,34 +24,35 @@
   },
   "dependencies": {
     "next": "15.5.4",
-    "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
   },
   "devDependencies": {
     "@eslint/css": "^0.11.1",
     "@eslint/eslintrc": "^3",
-    "@eslint/js": "^9.36.0",
+    "@eslint/js": "9.36.0",
     "@eslint/json": "^0.13.2",
     "@eslint/markdown": "^7.3.0",
     "@next/eslint-plugin-next": "15.5.4",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "8.44.1",
     "@typescript-eslint/parser": "8.44.1",
     "autoprefixer": "^10.4.21",
-    "eslint": "^9.36.0",
+    "eslint": "9.36.0",
     "eslint-config-next": "15.5.4",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react": "7.37.5",
-    "globals": "^16.4.0",
+    "globals": "15.15.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.3",
     "postcss": "^8.5.6",
     "prettier": "3.6.2",
     "tailwindcss": "^4.1.13",
-    "typescript": "^5",
-    "typescript-eslint": "^8.44.1"
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.45.0",
+    "license-checker-rseidelsohn": "4.4.2"
   }
 }
