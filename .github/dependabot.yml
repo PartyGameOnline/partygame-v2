@@ -21,7 +21,6 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
-
   # GitHub Actions（CI用Actionの更新）
   - package-ecosystem: "github-actions"
     directory: "/"
