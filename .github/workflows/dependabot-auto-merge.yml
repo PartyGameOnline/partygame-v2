@@ -21,7 +21,6 @@ jobs:
       github.actor == 'dependabot[bot]' ||
       (github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
-
     steps:
       # 0) ブランチ保護の「承認必須」対策として自動承認
       - name: Auto-approve Dependabot PR
@@ -29,7 +28,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 0.5) PR がドラフトなら Ready に切り替え（Actionの代替として gh CLI を使用）
+      # 0.5) PR がドラフトなら Ready に切り替え（gh CLI を使用）
       - name: Mark PR ready (if draft)
         if: ${{ github.event.pull_request.draft == true }}
         run: gh pr ready ${{ github.event.pull_request.number }} -R "${{ github.repository }}"
@@ -40,14 +39,8 @@ jobs:
       - name: Fetch metadata
         id: metadata
         uses: dependabot/fetch-metadata@v2
-
-      # 2) メジャーアップデート以外は GitHub の Auto-merge を有効化（squash）
-      - name: Enable auto-merge (non-major only)
-        if: ${{ steps.metadata.outputs.update-type != 'version-update:semver-major' }}
-        uses: peter-evans/enable-pull-request-automerge@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          merge-method: squash
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # 3) 必須チェックが success になるまで待機（この WF 自身は除外）
       - name: Wait for required checks
@@ -58,6 +51,15 @@ jobs:
           running-workflow-name: dependabot-auto-merge
           wait-interval: 10
           allowed-conclusions: success
+
+      # 2) メジャーアップデート以外は GitHub の Auto-merge を有効化（squash）
+      - name: Enable auto-merge (non-major only)
+        if: ${{ steps.metadata.outputs.update-type != 'version-update:semver-major' }}
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          pull-request-number: ${{ github.event.pull_request.number }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          merge-method: squash
 
       # 4) フォールバック：未マージなら API で squash merge
       - name: Merge when green (fallback)
