@@ -64,7 +64,7 @@ jobs:
       # 4) フォールバック：未マージなら API で squash merge
       - name: Merge when green (fallback)
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
