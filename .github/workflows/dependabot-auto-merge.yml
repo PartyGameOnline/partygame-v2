@@ -44,7 +44,7 @@ jobs:
 
       # 3) 必須チェックが success になるまで待機（この WF 自身は除外）
       - name: Wait for required checks
-        uses: lewagon/wait-on-check-action@v1.3.2
+        uses: lewagon/wait-on-check-action@v1.4.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
