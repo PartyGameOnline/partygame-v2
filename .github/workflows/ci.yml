@@ -13,6 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 既存の Ubuntu ジョブは lint/test/typecheck だけを担当
   ci:
     runs-on: ubuntu-latest
 
@@ -20,30 +21,53 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        task: [build, lint, test, typecheck]
+        task: [lint, test, typecheck] # ← build を除外
 
-    # ← strategy の後に name を置く
     name: ${{ matrix.task }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
+
       - name: Install
         run: npm ci
+
       - name: Lint
         if: ${{ matrix.task == 'lint' }}
         run: npm run lint
+
       - name: Typecheck
         if: ${{ matrix.task == 'typecheck' }}
         run: npx tsc --noEmit
+
       - name: Test
         if: ${{ matrix.task == 'test' }}
         run: npm test --if-present
+
+  # ビルドは Windows ランナーで実行（lightningcss のネイティブバイナリ問題を回避）
+  build-windows:
+    name: build (windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
       - name: Build
-        if: ${{ matrix.task == 'build' }}
         run: npm run build
