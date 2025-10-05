@@ -4,11 +4,13 @@ const isCI = process.env.CI === "true";
 
 const nextConfig: NextConfig = {
   experimental: {
-    // CI では Lightning CSS を使わない（PostCSSにフォールバック）
     optimizeCss: !isCI,
   },
-  // CI では next/font の最適化も切る（LightningCSS 経由の処理を避ける）
-  optimizeFonts: !isCI,
+  // このオプションで next/font の最適化を無効化
+  // Next 14 などバージョンによって名前が異なる可能性もある
+  fontLoaders: isCI ? [] : undefined,
+  // または
+  // optimizeFonts: !isCI,  ← すでに入れているならそれで十分な場合もあり
 };
 
 export default nextConfig;
