@@ -1,6 +1,6 @@
 // eslint.config.mjs
 import js from "@eslint/js";
-import globals from "globals";
+import { browser, node } from "globals"; // ★ v16 は named export
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactPlugin from "eslint-plugin-react";
@@ -22,7 +22,7 @@ export default [
       ecmaVersion: "latest",
       sourceType: "module",
       ecmaFeatures: { jsx: true },
-      globals: { ...globals.browser, ...globals.node },
+      globals: { ...browser, ...node }, // ★ ここも修正
     },
     plugins: { react: reactPlugin },
     rules: {
@@ -42,15 +42,15 @@ export default [
         sourceType: "module",
         ecmaFeatures: { jsx: true },
       },
-      globals: { ...globals.browser, ...globals.node },
+      globals: { ...browser, ...node }, // ★ 同上
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
       react: reactPlugin,
     },
     rules: {
-      "react/react-in-jsx-scope": "off", // これは1回だけ
-      "no-undef": "off", // TS/TSXでは未定義判定を無効化
+      "react/react-in-jsx-scope": "off",
+      "no-undef": "off",
     },
     settings: { react: { version: "detect" } },
   },
