@@ -1,28 +1,28 @@
 // eslint.config.mjs
 import js from "@eslint/js";
-import { browser, node } from "globals"; // ★ v16 は named export
+import globals from "globals";
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactPlugin from "eslint-plugin-react";
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
-export default [
-  // .eslintignore の代替
-  {
-    ignores: ["node_modules/", ".next/", "dist/", "build/", "out/", "coverage/"],
-  },
+const { browser: browserGlobals, node: nodeGlobals } = globals;
 
-  // JS の推奨
+export default [
+  // ignore（.eslintignore の代替）
+  { ignores: ["node_modules/", ".next/", "dist/", "build/", "out/", "coverage/"] },
+
+  // JS 推奨
   js.configs.recommended,
 
-  // JS/JSX
+  // JS / JSX
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
       ecmaFeatures: { jsx: true },
-      globals: { ...browser, ...node }, // ★ ここも修正
+      globals: { ...browserGlobals, ...nodeGlobals },
     },
     plugins: { react: reactPlugin },
     rules: {
@@ -31,7 +31,7 @@ export default [
     settings: { react: { version: "detect" } },
   },
 
-  // TS/TSX（type-aware ではない軽量モード）
+  // TS / TSX（type-aware なし）
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
@@ -42,12 +42,9 @@ export default [
         sourceType: "module",
         ecmaFeatures: { jsx: true },
       },
-      globals: { ...browser, ...node }, // ★ 同上
+      globals: { ...browserGlobals, ...nodeGlobals },
     },
-    plugins: {
-      "@typescript-eslint": tsPlugin,
-      react: reactPlugin,
-    },
+    plugins: { "@typescript-eslint": tsPlugin, react: reactPlugin },
     rules: {
       "react/react-in-jsx-scope": "off",
       "no-undef": "off",
