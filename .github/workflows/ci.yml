@@ -1,3 +1,4 @@
+# .github/workflows/ci.yml
 name: CI
 run-name: "CI • ${{ github.event_name }} • ${{ github.ref_name }} • ${{ github.actor }}"
 
@@ -7,27 +8,32 @@ on:
   push:
     branches: [main, master]
 
-# 同じブランチの古い実行はキャンセル（無駄な課金/消費を抑制）
+# 同じブランチで古い実行はキャンセル（時間・課金の無駄を削減）
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# 最小権限（必要十分）
+permissions:
+  contents: read
+
+env:
+  CI: true
+  NEXT_TELEMETRY_DISABLED: 1
+
 jobs:
-  # 既存の Ubuntu ジョブは lint/test/typecheck だけを担当
+  # Lint / Test / Typecheck は Ubuntu で並列
   ci:
     runs-on: ubuntu-latest
-
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        task: [lint, test, typecheck] # ← build を除外
-
+        task: [lint, test, typecheck]
     name: ${{ matrix.task }}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -36,7 +42,7 @@ jobs:
           cache: "npm"
 
       - name: Install
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Lint
         if: ${{ matrix.task == 'lint' }}
@@ -50,15 +56,15 @@ jobs:
         if: ${{ matrix.task == 'test' }}
         run: npm test --if-present
 
-  # ビルドは Windows ランナーで実行（lightningcss のネイティブバイナリ問題を回避）
+  # ビルドは Windows ランナーで（lightningcss のバイナリ問題を回避）
   build-windows:
     name: build (windows)
     runs-on: windows-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 20
+    needs: ci # ← 先に lint/test/typecheck が通ってからビルド
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -67,7 +73,16 @@ jobs:
           cache: "npm"
 
       - name: Install
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Build
         run: npm run build
+
+      # （任意）成果物をアーカイブしてデバッグしやすく
+      # - name: Upload .next for inspection
+      #   if: ${{ always() }}
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: next-build
+      #     path: .next
+      #     if-no-files-found: ignore
