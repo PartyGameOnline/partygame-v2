@@ -10,7 +10,7 @@
   "engines": {
     "node": ">=20 <21"
   },
-  "packageManager": "npm@10",
+  "packageManager": "npm@10.9.3",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
