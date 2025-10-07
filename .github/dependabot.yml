@@ -1,17 +1,36 @@
+# .github/dependabot.yml
 version: 2
+
 updates:
-  # npm（アプリ本体）
+  # 1) npm（アプリ本体）
   - package-ecosystem: "npm"
     directory: "/"
+    # 実行タイミング（今の設定を維持）
     schedule:
       interval: "weekly"
       day: "monday"
       time: "10:00"
       timezone: "Asia/Tokyo"
-    open-pull-requests-limit: 10
+
+    # PRが増えすぎないよう上限を少し絞る（=競合やレビューを減らす）
+    open-pull-requests-limit: 5
+
+    # main を前提にする（master を使わないならここで揃える）
+    target-branch: "main"
+
+    # 依存の引き上げ方：範囲が広すぎない increase が無難
+    versioning-strategy: increase
+
+    # ベースブランチが進んだら自動でrebase（CI再走しやすく競合減）
+    rebase-strategy: auto
+
+    # ラベルとコミットPrefix
     labels: ["dependencies"]
     commit-message:
       prefix: "deps(npm)"
+      include: "scope"
+
+    # メジャーは手動判断（現状維持）
     ignore:
       - dependency-name: "next"
         update-types: ["version-update:semver-major"]
@@ -20,7 +39,51 @@ updates:
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
 
-  # GitHub Actions（CI用Actionの更新）
+    # ＝★重要★＝ 競合を減らすための「グループ化」
+    # 似た依存を1PRにまとめ、lockfile の衝突確率を下げます
+    groups:
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+          - "eslint-config-next"
+          - "@next/eslint-plugin-next"
+        update-types: ["minor", "patch"]
+
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+        update-types: ["minor", "patch"]
+
+      eslint-prettier-types:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-*"
+          - "@typescript-eslint/*"
+          - "typescript-eslint"
+          - "prettier"
+          - "eslint-config-*"
+          - "eslint-plugin-*"
+          - "typescript"
+
+      css-tooling:
+        patterns:
+          - "tailwindcss"
+          - "@tailwindcss/*"
+          - "postcss"
+          - "autoprefixer"
+
+      test-tools:
+        patterns:
+          - "vitest"
+          - "jest"
+          - "@testing-library/*"
+
+  # 2) GitHub Actions（CIのAction）
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -28,7 +91,11 @@ updates:
       day: "monday"
       time: "10:30"
       timezone: "Asia/Tokyo"
-    open-pull-requests-limit: 10
+
+    target-branch: "main"
+    rebase-strategy: auto
+
+    open-pull-requests-limit: 5
     labels: ["dependencies"]
     commit-message:
       prefix: "deps(actions)"
