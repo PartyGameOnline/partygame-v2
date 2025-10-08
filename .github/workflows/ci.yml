@@ -33,7 +33,7 @@ jobs:
     name: ${{ matrix.task }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -64,7 +64,7 @@ jobs:
     needs: ci # ← 先に lint/test/typecheck が通ってからビルド
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v5
