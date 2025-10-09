@@ -15,6 +15,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "check:lock": "node scripts/check-lock.js --verbose",
+    "check:lock:ci": "node scripts/check-lock.js --ci",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "prepare": "husky",
@@ -24,8 +26,15 @@
     "licenses:summary": "license-checker-rseidelsohn --production --summary",
     "licenses:csv": "license-checker-rseidelsohn --production --csv --out licenses.csv"
   },
+  "lockcheck": {
+    "allow": [
+      "ansi-regex",
+      "debug"
+    ],
+    "deny": []
+  },
   "lint-staged": {
-    "*.{js,ts,tsx}": "eslint --fix",
+    "*.{js,ts,tsx}": "eslint --max-warnings=0",
     "*.{js,ts,tsx,css,md,json}": "prettier --write"
   },
   "dependencies": {
@@ -44,8 +53,8 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@typescript-eslint/eslint-plugin": "8.44.1",
-    "@typescript-eslint/parser": "8.44.1",
+    "@typescript-eslint/eslint-plugin": "8.45.0",
+    "@typescript-eslint/parser": "8.45.0",
     "autoprefixer": "^10.4.21",
     "critters": "0.0.23",
     "eslint": "9.37.0",
@@ -61,5 +70,18 @@
     "tailwindcss": "^4.1.14",
     "typescript": "5.9.3",
     "typescript-eslint": "8.45.0"
+  },
+  "overrides": {
+    "@eslint/core": "0.16.0",
+    "@eslint/plugin-kit": "0.4.0",
+    "@typescript-eslint/eslint-plugin": "8.45.0",
+    "@typescript-eslint/parser": "8.45.0",
+    "@typescript-eslint/project-service": "8.45.0",
+    "@typescript-eslint/scope-manager": "8.45.0",
+    "@typescript-eslint/tsconfig-utils": "8.45.0",
+    "@typescript-eslint/types": "8.45.0",
+    "@typescript-eslint/typescript-estree": "8.45.0",
+    "@typescript-eslint/utils": "8.45.0",
+    "@typescript-eslint/visitor-keys": "8.45.0"
   }
 }

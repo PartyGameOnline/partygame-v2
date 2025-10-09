@@ -8,12 +8,10 @@ on:
   push:
     branches: [main, master]
 
-# 同じブランチで古い実行はキャンセル（時間・課金の無駄を削減）
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# 最小権限（必要十分）
 permissions:
   contents: read
 
@@ -22,7 +20,7 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
-  # Lint / Test / Typecheck は Ubuntu で並列
+  # Lint / Test / Typecheck を並列化
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -31,58 +29,84 @@ jobs:
       matrix:
         task: [lint, test, typecheck]
     name: ${{ matrix.task }}
+
     steps:
-      - name: Checkout
+      - name: Checkout (shallow)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1 # ← 速い
 
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
+          cache: npm
+          cache-dependency-path: "package-lock.json" # ← lock にひも付け
 
+      # -------------------- 追加キャッシュ（効くやつ） --------------------
+      - name: Restore ESLint cache
+        if: ${{ matrix.task == 'lint' }}
+        uses: actions/cache@v4
+        with:
+          path: .cache/eslint
+          key: ${{ runner.os }}-eslint-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx,cjs,mjs,cts,mts}') }}
+          restore-keys: |
+            ${{ runner.os }}-eslint-${{ hashFiles('package-lock.json') }}-
+
+      - name: Restore Next.js cache
+        if: ${{ matrix.task == 'test' || matrix.task == 'typecheck' }} # どれでもOK。重複復元しても無害
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextcache-${{ hashFiles('package-lock.json') }}-${{ hashFiles('next.config.*') }}
+          restore-keys: |
+            ${{ runner.os }}-nextcache-${{ hashFiles('package-lock.json') }}-
+      # -------------------------------------------------------------------
       - name: Install
-        run: npm ci --no-audit --fund=false
+        run: npm ci --no-audit --no-fund
 
       - name: Lint
         if: ${{ matrix.task == 'lint' }}
-        run: npm run lint
+        run: npx eslint . --max-warnings=0 --cache --cache-location ./.cache/eslint
 
       - name: Typecheck
         if: ${{ matrix.task == 'typecheck' }}
-        run: npx tsc --noEmit
+        run: npx tsc -p tsconfig.json --noEmit --pretty false
 
       - name: Test
         if: ${{ matrix.task == 'test' }}
         run: npm test --if-present
 
-  # ビルドは Windows ランナーで（lightningcss のバイナリ問題を回避）
+  # Windows ビルドは push のみ（PRは省略して待ち時間削減）
   build-windows:
     name: build (windows)
+    if: github.event_name == 'push' # ← PRではスキップ。必要なら消してください
     runs-on: windows-latest
     timeout-minutes: 20
-    needs: ci # ← 先に lint/test/typecheck が通ってからビルド
+    needs: ci
     steps:
-      - name: Checkout
+      - name: Checkout (shallow)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
+          cache: npm
+          cache-dependency-path: "package-lock.json"
+
+      - name: Restore Next.js cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextcache-${{ hashFiles('package-lock.json') }}-${{ hashFiles('next.config.*') }}
+          restore-keys: |
+            ${{ runner.os }}-nextcache-${{ hashFiles('package-lock.json') }}-
 
       - name: Install
-        run: npm ci --no-audit --fund=false
+        run: npm ci --no-audit --no-fund
 
       - name: Build
         run: npm run build
-
-      # （任意）成果物をアーカイブしてデバッグしやすく
-      # - name: Upload .next for inspection
-      #   if: ${{ always() }}
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: next-build
-      #     path: .next
-      #     if-no-files-found: ignore
