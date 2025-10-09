@@ -15,14 +15,14 @@ export default [
   // JS 推奨
   js.configs.recommended,
 
-  // JS / JSX
+  // JS / JSX（Flat Config では ecmaFeatures は使わない）
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      ecmaFeatures: { jsx: true },
       globals: { ...browserGlobals, ...nodeGlobals },
+      // ← ecmaFeatures は置かない
     },
     plugins: { react: reactPlugin },
     rules: {
@@ -40,7 +40,7 @@ export default [
         project: false,
         ecmaVersion: "latest",
         sourceType: "module",
-        ecmaFeatures: { jsx: true },
+        // ← ここにも ecmaFeatures は置かない
       },
       globals: { ...browserGlobals, ...nodeGlobals },
     },
