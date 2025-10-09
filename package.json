@@ -34,7 +34,7 @@
     "deny": []
   },
   "lint-staged": {
-    "*.{js,ts,tsx}": "eslint --fix",
+    "*.{js,ts,tsx}": "eslint --max-warnings=0",
     "*.{js,ts,tsx,css,md,json}": "prettier --write"
   },
   "dependencies": {
