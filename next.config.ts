@@ -3,16 +3,11 @@ import type { NextConfig } from "next";
 const isCI = process.env.CI === "true";
 
 const nextConfig: NextConfig = {
-  // ✅ optimizeCss は Next.js 15 でも有効（CI環境では無効化）
   experimental: {
+    // Turbopack 時に効くCSS最適化（警告に出ていた通り有効）
     optimizeCss: !isCI,
   },
-
-  // ❌ fontLoaders は Next.js 15 では非対応のため削除
-  // 🟢 代わりに optimizeFonts を明示的に使用
-  optimizeFonts: !isCI,
-
-  // 他の設定がある場合はこの下に追記
+  // NOTE: optimizeFonts は Next.js 15 で削除されたため設定不要
 };
 
 export default nextConfig;
