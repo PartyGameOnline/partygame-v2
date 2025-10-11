@@ -25,7 +25,8 @@
     "test": "echo \"no tests yet\" && exit 0",
     "check": "npm run lint && npm run typecheck",
     "licenses:summary": "license-checker-rseidelsohn --production --summary",
-    "licenses:csv": "license-checker-rseidelsohn --production --csv --out licenses.csv"
+    "licenses:csv": "license-checker-rseidelsohn --production --csv --out licenses.csv",
+    "smoke:counter": "tsx scripts/smoke-counter.ts"
   },
   "lockcheck": {
     "allow": [
