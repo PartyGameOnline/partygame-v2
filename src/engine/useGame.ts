@@ -1,30 +1,26 @@
 "use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameEngine } from "./GameEngine";
 import type { GameSpec, SyncAdapter } from "./types";
 
-/** メモリアダプタ（デモ用） */
 class MemoryAdapter<S, _E> implements SyncAdapter<S, _E> {
   private store = new Map<string, S>();
   private subs = new Map<string, Set<(s: S) => void>>();
-
-  async load(roomCode: string): Promise<S | undefined> {
+  async load(roomCode: string) {
     return this.store.get(roomCode);
   }
-  async save(roomCode: string, state: S): Promise<void> {
+  async save(roomCode: string, state: S) {
     this.store.set(roomCode, state);
-    const set = this.subs.get(roomCode);
-    if (set) for (const cb of set) cb(state);
+    this.subs.get(roomCode)?.forEach((cb) => cb(state));
   }
-  subscribe(roomCode: string, cb: (s: S) => void): () => void {
+  subscribe(roomCode: string, cb: (s: S) => void) {
     let set = this.subs.get(roomCode);
-    if (!set) {
-      set = new Set();
-      this.subs.set(roomCode, set);
-    }
+    if (!set) this.subs.set(roomCode, (set = new Set()));
     set.add(cb);
-    return () => set!.delete(cb);
+    return () => {
+      set!.delete(cb);
+      if (set!.size === 0) this.subs.delete(roomCode);
+    };
   }
 }
 
@@ -34,10 +30,13 @@ type UseGameOpts<S, E> = {
   saveDebounceMs?: number;
 };
 
-export function useGame<S, E>(spec: GameSpec<S, E>, opts?: UseGameOpts<S, E>) {
-  const { roomCode, adapter, saveDebounceMs = 120 } = opts ?? {};
+export function useGame<S, E>(spec: GameSpec<S, E>, opts: UseGameOpts<S, E> = {}) {
+  const { roomCode, adapter, saveDebounceMs = 150 } = opts;
 
-  const effectiveAdapter = useMemo(() => adapter ?? new MemoryAdapter<S, E>(), [adapter]);
+  const effectiveAdapter = useMemo<SyncAdapter<S, E>>(
+    () => adapter ?? new MemoryAdapter<S, E>(),
+    [adapter]
+  );
 
   const engineRef = useRef<GameEngine<S, E> | null>(null);
   if (engineRef.current === null) engineRef.current = new GameEngine<S, E>(spec);
@@ -51,36 +50,15 @@ export function useGame<S, E>(spec: GameSpec<S, E>, opts?: UseGameOpts<S, E>) {
       if (!roomCode) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        void effectiveAdapter.save(roomCode, s as S);
+        saveTimerRef.current = null;
+        console.log("[RT] schedule save -> save()");
+        void effectiveAdapter.save(roomCode, s as S).catch(console.error);
       }, saveDebounceMs);
     },
     [roomCode, effectiveAdapter, saveDebounceMs]
   );
 
-  useEffect(() => {
-    if (!roomCode) return;
-    let alive = true;
-    let unsub = () => {};
-
-    (async () => {
-      const remote = await effectiveAdapter.load(roomCode);
-      if (!alive) return;
-      if (remote !== undefined) {
-        engine.replaceState(remote);
-      } else {
-        await effectiveAdapter.save(roomCode, engine.getState() as S);
-      }
-      unsub = effectiveAdapter.subscribe(roomCode, (incoming: S) => {
-        engine.replaceState(incoming);
-      });
-    })();
-
-    return () => {
-      alive = false;
-      unsub();
-    };
-  }, [roomCode, effectiveAdapter, engine]);
-
+  // Engine -> React (更新のたび保存をスケジュール)
   useEffect(() => {
     return engine.subscribe((s) => {
       setState(s);
@@ -88,10 +66,39 @@ export function useGame<S, E>(spec: GameSpec<S, E>, opts?: UseGameOpts<S, E>) {
     });
   }, [engine, scheduleSave]);
 
-  return {
-    state,
-    dispatch: (e: E) => engine.dispatch(e),
-    replaceState: (s: S) => engine.replaceState(s),
-    engine,
-  };
+  // リモート同期（初回 load / 無ければ upsert / subscribe）
+  useEffect(() => {
+    if (!roomCode) return;
+    let alive = true;
+    let unsubRemote: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const remote = await effectiveAdapter.load(roomCode);
+        if (!alive) return;
+        if (remote !== undefined) {
+          console.log("[RT] loaded remote -> replaceState");
+          engine.replaceState(remote);
+        } else {
+          console.log("[RT] no row -> upsert initial");
+          await effectiveAdapter.save(roomCode, engine.getState() as S);
+        }
+        unsubRemote = effectiveAdapter.subscribe(roomCode, (incoming: S) => {
+          console.log("[RT] incoming remote -> replaceState");
+          engine.replaceState(incoming);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+
+    return () => {
+      alive = false;
+      if (unsubRemote) unsubRemote();
+    };
+  }, [roomCode, effectiveAdapter, engine]);
+
+  const dispatch = useCallback((e: E) => engine.dispatch(e), [engine]);
+
+  return { state, dispatch, replaceState: (s: S) => engine.replaceState(s), engine };
 }
