@@ -1,10 +1,10 @@
 import CounterView from "../../games/counter/CounterView";
 
-export default function CounterPage() {
-  return (
-    <main style={{ padding: 24 }}>
-      <h1>Counter Demo</h1>
-      <CounterView />
-    </main>
-  );
+export default function Page({ searchParams }: { searchParams: { room?: string } }) {
+  const roomCode =
+    typeof searchParams?.room === "string" && searchParams.room.length > 0
+      ? searchParams.room
+      : undefined;
+
+  return <CounterView roomCode={roomCode} />;
 }

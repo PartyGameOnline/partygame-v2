@@ -32,12 +32,12 @@ jobs:
 
     steps:
       - name: Checkout (shallow)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1 # ← 速い
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
           cache: npm
@@ -86,12 +86,12 @@ jobs:
     needs: ci
     steps:
       - name: Checkout (shallow)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
           cache: npm
