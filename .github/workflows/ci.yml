@@ -46,7 +46,7 @@ jobs:
       # -------------------- 追加キャッシュ（効くやつ） --------------------
       - name: Restore ESLint cache
         if: ${{ matrix.task == 'lint' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .cache/eslint
           key: ${{ runner.os }}-eslint-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.{js,jsx,ts,tsx,cjs,mjs,cts,mts}') }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Restore Next.js cache
         if: ${{ matrix.task == 'test' || matrix.task == 'typecheck' }} # どれでもOK。重複復元しても無害
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .next/cache
           key: ${{ runner.os }}-nextcache-${{ hashFiles('package-lock.json') }}-${{ hashFiles('next.config.*') }}
@@ -98,7 +98,7 @@ jobs:
           cache-dependency-path: "package-lock.json"
 
       - name: Restore Next.js cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .next/cache
           key: ${{ runner.os }}-nextcache-${{ hashFiles('package-lock.json') }}-${{ hashFiles('next.config.*') }}
