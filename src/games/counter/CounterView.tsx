@@ -36,86 +36,39 @@ function CounterRoom({ roomCode }: { roomCode: string }) {
   const push = (m: string) =>
     setLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${m}`]);
 
-  // adapter は「タブ単位で1個」でOK
   const eventAdapter = useMemo(() => new SupabaseEventAdapter<CounterEvent>(supabase), []);
-
-  // devtools から触れるように（PC検証用）
-  useEffect(() => {
-    if (process.env.NODE_ENV === "production") return;
-    (window as any).supabase = supabase;
-  }, []);
 
   useEffect(() => {
     push("mode = EVENT_SYNC (realtime input)");
     push(`room = ${roomCode}`);
   }, [roomCode]);
 
-  // メイン：イベント同期（これがUIの数字を動かす）
   const { state, dispatch } = useGameEventSync<CounterState, CounterEvent>(counterSpec, {
     roomCode,
     adapter: eventAdapter,
   });
 
-  // ---- PROBE(1): adapter.subscribe(roomCode, filterあり) が動くか ----
-  const unsubFilteredRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    unsubFilteredRef.current?.();
-    push("[PROBE] filtered subscribe() start");
+  const devOnly = process.env.NODE_ENV !== "production";
+  const unsubRef = useRef<(() => void) | null>(null);
 
-    unsubFilteredRef.current = eventAdapter.subscribe(roomCode, (env) => {
+  useEffect(() => {
+    if (!devOnly) return;
+
+    unsubRef.current?.();
+    unsubRef.current = eventAdapter.subscribe(roomCode, (env) => {
       push(
-        `[PROBE] filtered recv id=${env.id} from=${env.clientId.slice(
-          0,
-          8
-        )} event=${JSON.stringify(env.event)}`
+        `recv event(id=${env.id}) from=${env.clientId.slice(0, 8)} event=${JSON.stringify(
+          env.event
+        )}`
       );
     });
-
-    push("[PROBE] filtered subscribe() set");
-
-    return () => {
-      unsubFilteredRef.current?.();
-      unsubFilteredRef.current = null;
-      push("[PROBE] filtered unsubscribe()");
-    };
-  }, [roomCode, eventAdapter]);
-
-  // ---- PROBE(2): filter無しで “全部” 受け取れるか（publication/権限の切り分け） ----
-  const unsubRawRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    unsubRawRef.current?.();
-    push("[PROBE] raw subscribe(no filter) start");
-
-    const ch = supabase
-      .channel("probe-game-events-all")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "game_events" },
-        (payload) => {
-          const row = payload.new as any;
-          push(
-            `[PROBE] raw recv room=${row?.room_code ?? "?"} id=${row?.id ?? "?"} client=${String(
-              row?.client_id ?? ""
-            ).slice(0, 8)} event=${JSON.stringify(row?.event ?? null)}`
-          );
-        }
-      )
-      .subscribe((status) => {
-        push(`[PROBE] raw status=${status}`);
-      });
-
-    push("[PROBE] raw subscribe set");
-
-    unsubRawRef.current = () => {
-      push("[PROBE] raw unsubscribe()");
-      void supabase.removeChannel(ch);
-    };
+    push("debug subscribe() called (dev only)");
 
     return () => {
-      unsubRawRef.current?.();
-      unsubRawRef.current = null;
+      unsubRef.current?.();
+      unsubRef.current = null;
     };
-  }, []);
+  }, [devOnly, roomCode, eventAdapter]);
 
   useEffect(() => {
     push(`render value=${state.value}`);
