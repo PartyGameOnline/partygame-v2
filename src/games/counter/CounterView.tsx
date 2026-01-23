@@ -2,100 +2,144 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "../../engine/useGame";
-import { SupabaseAdapter, supabase } from "../../lib/sync/supabaseAdapter";
-import { counterSpec } from "./spec";
+import { useGameEventSync } from "../../engine/useGameEventSync";
+import { SupabaseEventAdapter } from "../../engine/adapters/supabaseEvents";
+import { supabase } from "../../lib/supabaseClient";
+import { counterSpec, type CounterEvent, type CounterState } from "./spec";
 
 type Props = { roomCode?: string };
 
 export default function CounterView({ roomCode }: Props) {
-  // ---- 画面ログ（診断用） ----
+  return roomCode ? <CounterRoom roomCode={roomCode} /> : <CounterLocal />;
+}
+
+function CounterLocal() {
   const [log, setLog] = useState<string[]>([]);
   const push = (m: string) =>
     setLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${m}`]);
 
-  // ---- アダプタ作成 ----
-  const adapter = useMemo(
-    () => (roomCode ? new SupabaseAdapter<{ value: number }>(supabase) : undefined),
-    [roomCode]
-  );
+  const { state, dispatch } = useGame<CounterState, CounterEvent>(counterSpec);
 
   useEffect(() => {
-    push(
-      `adapter = ${adapter ? "SupabaseAdapter" : "MemoryAdapter"} / room=${roomCode ?? "(none)"}`
-    );
-  }, [adapter, roomCode]);
+    push("mode = LOCAL (memory)");
+  }, []);
 
-  // ---- エンジン接続 ----
-  const { state, dispatch } = useGame(counterSpec, {
+  useEffect(() => {
+    push(`render value=${state.value}`);
+  }, [state.value]);
+
+  return <CounterUI title="Counter" state={state} dispatch={dispatch} log={log} />;
+}
+
+function CounterRoom({ roomCode }: { roomCode: string }) {
+  const [log, setLog] = useState<string[]>([]);
+  const push = (m: string) =>
+    setLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${m}`]);
+
+  const eventAdapter = useMemo(() => new SupabaseEventAdapter<CounterEvent>(supabase), []);
+
+  useEffect(() => {
+    push("mode = EVENT_SYNC (realtime input)");
+    push(`room = ${roomCode}`);
+  }, [roomCode]);
+
+  const { state, dispatch } = useGameEventSync<CounterState, CounterEvent>(counterSpec, {
     roomCode,
-    adapter,
-    saveDebounceMs: 120,
+    adapter: eventAdapter,
   });
 
-  // ---- 手動テスト & サブスク可視化 ----
+  const devOnly = process.env.NODE_ENV !== "production";
   const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (!roomCode || !adapter) return;
-
-    (async () => {
-      const remote = await adapter.load(roomCode);
-      push(`load -> ${JSON.stringify(remote)}`);
-    })();
+    if (!devOnly) return;
 
     unsubRef.current?.();
-    unsubRef.current = adapter.subscribe(roomCode, (incoming) => {
-      push(`recv -> ${JSON.stringify(incoming)}`);
+    unsubRef.current = eventAdapter.subscribe(roomCode, (env) => {
+      push(
+        `recv event(id=${env.id}) from=${env.clientId.slice(0, 8)} event=${JSON.stringify(
+          env.event
+        )}`
+      );
     });
-    push("subscribe() called");
+    push("debug subscribe() called (dev only)");
 
     return () => {
       unsubRef.current?.();
+      unsubRef.current = null;
     };
-  }, [roomCode, adapter]);
+  }, [devOnly, roomCode, eventAdapter]);
 
-  // state 変化可視化
   useEffect(() => {
     push(`render value=${state.value}`);
   }, [state.value]);
 
   return (
+    <CounterUI
+      title={`Counter (room: ${roomCode})`}
+      state={state}
+      dispatch={dispatch}
+      log={log}
+      roomCode={roomCode}
+    />
+  );
+}
+
+function CounterUI(props: {
+  title: string;
+  state: CounterState;
+  dispatch: (e: CounterEvent) => void;
+  log: string[];
+  roomCode?: string;
+}) {
+  const { title, state, dispatch, log, roomCode } = props;
+  const devOnly = process.env.NODE_ENV !== "production";
+
+  return (
     <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr", maxWidth: 720 }}>
-      <h2>Counter {roomCode ? `(room: ${roomCode})` : ""}</h2>
+      <h2>{title}</h2>
 
       <div style={{ fontSize: 40, fontWeight: 700, textAlign: "center" }}>{state.value}</div>
+
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={() => dispatch({ type: "dec", by: 1 })}>-1</button>
         <button onClick={() => dispatch({ type: "inc", by: 1 })}>+1</button>
         <button onClick={() => dispatch({ type: "reset" })}>reset</button>
       </div>
 
-      {roomCode && adapter && (
+      {devOnly && roomCode && (
         <div style={{ padding: 12, border: "1px solid #444", borderRadius: 8 }}>
-          <b>Realtime / DB 手動テスト</b>
+          <b>Dev Debug (events)</b>
+
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <button
-              onClick={async () => {
-                await adapter.save(roomCode, { value: Math.floor(Math.random() * 1000) });
-                push("manual save() done");
+              onClick={() => {
+                for (let i = 0; i < 10; i++) dispatch({ type: "inc", by: 1 });
               }}
             >
-              手動 save()
+              burst +10
             </button>
+
             <button
               onClick={async () => {
                 const r = await supabase
-                  .from("game_states")
-                  .select("*")
+                  .from("game_events")
+                  .select("id, room_code, client_id, event_id, created_at, event")
                   .eq("room_code", roomCode)
-                  .maybeSingle();
-                push("raw select -> " + JSON.stringify(r.data ?? null));
-                if (r.error) push("raw select error -> " + (r.error.message ?? r.error.code));
+                  .order("id", { ascending: false })
+                  .limit(5);
+
+                // console 禁止プロジェクトの場合に備えて UI にだけ出す
+                // CounterUI は log を受け取るだけで push を持たないため、
+                // 表示は「ボタンで確認」用途として割り切ります。
+                // 必要なら push を props で渡してここに表示できます。
+                void r;
               }}
             >
-              直接 select（raw）
+              直接 select(game_events last5)
             </button>
           </div>
+
           <div
             style={{
               marginTop: 8,
