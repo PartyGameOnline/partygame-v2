@@ -14,3 +14,19 @@ export interface SyncAdapter<S, _E> {
   save(roomCode: string, state: S): Promise<void>;
   subscribe(roomCode: string, cb: (remote: S) => void): () => void;
 }
+
+export type RemoteEventEnvelope<E> = {
+  id: number; // DBの連番
+  roomCode: string;
+  event: E;
+  clientId: string;
+  eventId: string; // uuid
+  createdAt?: string;
+};
+
+export interface EventSyncAdapter<E> {
+  loadAfter(roomCode: string, afterId: number): Promise<RemoteEventEnvelope<E>[]>;
+  publish(roomCode: string, event: E): Promise<void>;
+  subscribe(roomCode: string, cb: (envelope: RemoteEventEnvelope<E>) => void): () => void;
+  getClientId(): string;
+}

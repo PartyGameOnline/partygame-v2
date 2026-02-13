@@ -44,10 +44,31 @@ export function useGame<S, E>(spec: GameSpec<S, E>, opts: UseGameOpts<S, E> = {}
 
   const [state, setState] = useState<Readonly<S>>(engine.getState());
 
+  // 追加: 初回同期完了フラグ（load→(必要ならreplace/upsert)→subscribe開始まで false）
+  const hydratedRef = useRef(false);
+  // 追加: リモートからの state 適用中フラグ（この間は save を抑止）
+  const applyingRemoteRef = useRef(false);
+
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 追加: アンマウント時にタイマーを確実に止める
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    };
+  }, []);
+
   const scheduleSave = useCallback(
     (s: Readonly<S>) => {
       if (!roomCode) return;
+
+      // 追加: 初回同期完了まで保存しない（リモート行の上書き事故を防ぐ）
+      if (!hydratedRef.current) return;
+
+      // 追加: リモート反映中は保存しない（無駄な書き込み・更新リレーを防ぐ）
+      if (applyingRemoteRef.current) return;
+
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         saveTimerRef.current = null;
@@ -69,23 +90,36 @@ export function useGame<S, E>(spec: GameSpec<S, E>, opts: UseGameOpts<S, E> = {}
   // リモート同期（初回 load / 無ければ upsert / subscribe）
   useEffect(() => {
     if (!roomCode) return;
+
     let alive = true;
     let unsubRemote: (() => void) | undefined;
+
+    // 追加: roomCode/adapter が変わるたび同期状態をリセット
+    hydratedRef.current = false;
 
     (async () => {
       try {
         const remote = await effectiveAdapter.load(roomCode);
         if (!alive) return;
+
         if (remote !== undefined) {
           console.log("[RT] loaded remote -> replaceState");
+          applyingRemoteRef.current = true;
           engine.replaceState(remote);
+          applyingRemoteRef.current = false;
         } else {
           console.log("[RT] no row -> upsert initial");
           await effectiveAdapter.save(roomCode, engine.getState() as S);
         }
+
+        // 追加: 初回同期完了（ここからローカル変更を保存してよい）
+        hydratedRef.current = true;
+
         unsubRemote = effectiveAdapter.subscribe(roomCode, (incoming: S) => {
           console.log("[RT] incoming remote -> replaceState");
+          applyingRemoteRef.current = true;
           engine.replaceState(incoming);
+          applyingRemoteRef.current = false;
         });
       } catch (e) {
         console.error(e);
@@ -94,6 +128,7 @@ export function useGame<S, E>(spec: GameSpec<S, E>, opts: UseGameOpts<S, E> = {}
 
     return () => {
       alive = false;
+      hydratedRef.current = false;
       if (unsubRemote) unsubRemote();
     };
   }, [roomCode, effectiveAdapter, engine]);
