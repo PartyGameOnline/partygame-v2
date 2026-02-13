@@ -36,39 +36,86 @@ function CounterRoom({ roomCode }: { roomCode: string }) {
   const push = (m: string) =>
     setLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${m}`]);
 
+  // adapter は「タブ単位で1個」でOK
   const eventAdapter = useMemo(() => new SupabaseEventAdapter<CounterEvent>(supabase), []);
+
+  // devtools から触れるように（PC検証用）
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    (window as any).supabase = supabase;
+  }, []);
 
   useEffect(() => {
     push("mode = EVENT_SYNC (realtime input)");
     push(`room = ${roomCode}`);
   }, [roomCode]);
 
+  // メイン：イベント同期（これがUIの数字を動かす）
   const { state, dispatch } = useGameEventSync<CounterState, CounterEvent>(counterSpec, {
     roomCode,
     adapter: eventAdapter,
   });
 
-  const devOnly = process.env.NODE_ENV !== "production";
-  const unsubRef = useRef<(() => void) | null>(null);
-
+  // ---- PROBE(1): adapter.subscribe(roomCode, filterあり) が動くか ----
+  const unsubFilteredRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!devOnly) return;
+    unsubFilteredRef.current?.();
+    push("[PROBE] filtered subscribe() start");
 
-    unsubRef.current?.();
-    unsubRef.current = eventAdapter.subscribe(roomCode, (env) => {
+    unsubFilteredRef.current = eventAdapter.subscribe(roomCode, (env) => {
       push(
-        `recv event(id=${env.id}) from=${env.clientId.slice(0, 8)} event=${JSON.stringify(
-          env.event
-        )}`
+        `[PROBE] filtered recv id=${env.id} from=${env.clientId.slice(
+          0,
+          8
+        )} event=${JSON.stringify(env.event)}`
       );
     });
-    push("debug subscribe() called (dev only)");
+
+    push("[PROBE] filtered subscribe() set");
 
     return () => {
-      unsubRef.current?.();
-      unsubRef.current = null;
+      unsubFilteredRef.current?.();
+      unsubFilteredRef.current = null;
+      push("[PROBE] filtered unsubscribe()");
     };
-  }, [devOnly, roomCode, eventAdapter]);
+  }, [roomCode, eventAdapter]);
+
+  // ---- PROBE(2): filter無しで “全部” 受け取れるか（publication/権限の切り分け） ----
+  const unsubRawRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    unsubRawRef.current?.();
+    push("[PROBE] raw subscribe(no filter) start");
+
+    const ch = supabase
+      .channel("probe-game-events-all")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "game_events" },
+        (payload) => {
+          const row = payload.new as any;
+          push(
+            `[PROBE] raw recv room=${row?.room_code ?? "?"} id=${row?.id ?? "?"} client=${String(
+              row?.client_id ?? ""
+            ).slice(0, 8)} event=${JSON.stringify(row?.event ?? null)}`
+          );
+        }
+      )
+      .subscribe((status) => {
+        push(`[PROBE] raw status=${status}`);
+      });
+
+    push("[PROBE] raw subscribe set");
+
+    unsubRawRef.current = () => {
+      push("[PROBE] raw unsubscribe()");
+      void supabase.removeChannel(ch);
+    };
+
+    return () => {
+      unsubRawRef.current?.();
+      unsubRawRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     push(`render value=${state.value}`);
@@ -93,6 +140,12 @@ function CounterUI(props: {
   roomCode?: string;
 }) {
   const { title, state, dispatch, log, roomCode } = props;
+
+  // hydration mismatch 回避（マウント後に描画）
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
   const devOnly = process.env.NODE_ENV !== "production";
 
   return (
@@ -118,25 +171,6 @@ function CounterUI(props: {
               }}
             >
               burst +10
-            </button>
-
-            <button
-              onClick={async () => {
-                const r = await supabase
-                  .from("game_events")
-                  .select("id, room_code, client_id, event_id, created_at, event")
-                  .eq("room_code", roomCode)
-                  .order("id", { ascending: false })
-                  .limit(5);
-
-                // console 禁止プロジェクトの場合に備えて UI にだけ出す
-                // CounterUI は log を受け取るだけで push を持たないため、
-                // 表示は「ボタンで確認」用途として割り切ります。
-                // 必要なら push を props で渡してここに表示できます。
-                void r;
-              }}
-            >
-              直接 select(game_events last5)
             </button>
           </div>
 

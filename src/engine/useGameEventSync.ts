@@ -18,16 +18,22 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventO
 
   const [state, setState] = useState<Readonly<S>>(engine.getState());
 
-  // 最後に適用したDBイベントID（取りこぼし復旧に使う）
-  const lastAppliedIdRef = useRef<number>(0);
+  const myClientIdRef = useRef<string>(adapter.getClientId());
 
-  // 同一eventIdを二重適用しないための簡易ガード（念のため）
-  const seenEventIdsRef = useRef<Set<string>>(new Set());
+  // 部屋ごとの lastApplied を保持(部屋移動/HotReloadに強くする)
+  const lastAppliedByRoomRef = useRef<Map<string, number>>(new Map());
+  const lastAppliedIdRef = useRef<number>(0);
 
   // Engine -> React
   useEffect(() => {
     return engine.subscribe((s) => setState(s));
   }, [engine]);
+
+  // ★重要：roomCodeが変わったら「必ず」復元/リセットする（Fast Refresh対策）
+  useEffect(() => {
+    const last = lastAppliedByRoomRef.current.get(roomCode) ?? 0;
+    lastAppliedIdRef.current = last;
+  }, [roomCode]);
 
   // Remote -> Engine（subscribe + catch-up）
   useEffect(() => {
@@ -35,22 +41,26 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventO
     let unsub: (() => void) | undefined;
 
     const apply = (env: RemoteEventEnvelope<E>) => {
-      // 自己エコーは無視（adapter側で弾けるが二重防御）
-      if (env.clientId === adapter.getClientId()) return;
+      if (env.clientId === myClientIdRef.current) return;
 
-      if (seenEventIdsRef.current.has(env.eventId)) return;
-      seenEventIdsRef.current.add(env.eventId);
+      // ここを追加（重要）
+      console.log("[HOOK] apply", { id: env.id, event: env.event });
 
-      // 古い/重複（idが戻るケース）を弾く
+      if (env.id < lastAppliedIdRef.current) {
+        lastAppliedIdRef.current = 0;
+        lastAppliedByRoomRef.current.set(roomCode, 0);
+      }
       if (env.id <= lastAppliedIdRef.current) return;
 
       lastAppliedIdRef.current = env.id;
+      lastAppliedByRoomRef.current.set(roomCode, env.id);
+
       engine.dispatch(env.event);
     };
 
     (async () => {
       try {
-        // 1) まず catch-up（subscribe 前後の取りこぼしも拾えるように）
+        // 1) catch-up
         const missed = await adapter.loadAfter(roomCode, lastAppliedIdRef.current);
         if (!alive) return;
         for (const env of missed) apply(env);
@@ -61,7 +71,7 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventO
           apply(env);
         });
 
-        // 3) subscribe開始直後にもう一回 catch-up（ごく短いレース対策）
+        // 3) subscribe直後にもう一回catch-up
         const missed2 = await adapter.loadAfter(roomCode, lastAppliedIdRef.current);
         if (!alive) return;
         for (const env of missed2) apply(env);
@@ -76,10 +86,9 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventO
     };
   }, [roomCode, adapter, engine]);
 
-  // Local dispatch（ローカル適用→publish）
+  // Local dispatch（ローカル即適用→publish）
   const dispatch = useCallback(
     (e: E) => {
-      // 体感遅延を無くすためローカルは即適用
       engine.dispatch(e);
       void adapter.publish(roomCode, e).catch(console.error);
     },
