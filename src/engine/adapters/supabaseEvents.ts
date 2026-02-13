@@ -2,11 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EventSyncAdapter, RemoteEventEnvelope } from "../types";
 
 type Row = {
-  id: number;
+  id: number | string; // bigint が文字列で来る可能性に対応
   room_code: string;
-  event: any;
+  event: unknown;
   client_id: string;
-  event_id: string;
+  event_id: string | null;
   created_at?: string;
 };
 
@@ -33,11 +33,11 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
     if (error) throw error;
 
     return (data as Row[]).map((r) => ({
-      id: r.id,
+      id: toNumberId(r.id),
       roomCode: r.room_code,
       event: r.event as E,
       clientId: r.client_id,
-      eventId: r.event_id,
+      eventId: r.event_id ?? "",
       createdAt: r.created_at,
     }));
   }
@@ -55,8 +55,13 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
   }
 
   subscribe(roomCode: string, cb: (env: RemoteEventEnvelope<E>) => void): () => void {
+    // ★呼び出しごとにユニークな channel 名にする（同名衝突を避ける）
+    const channelName = `game_events:${roomCode}:${this.clientId}:${Date.now()}:${Math.random()
+      .toString(36)
+      .slice(2)}`;
+
     const channel = this.client
-      .channel(`game_events:${roomCode}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -66,30 +71,41 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
           filter: `room_code=eq.${roomCode}`,
         },
         (payload) => {
+          console.log("[EV] recv payload:", payload);
+
           const row = payload.new as Row | null;
           if (!row) return;
 
           const env: RemoteEventEnvelope<E> = {
-            id: row.id,
+            id: toNumberId(row.id),
             roomCode: row.room_code,
             event: row.event as E,
             clientId: row.client_id,
-            eventId: row.event_id,
+            eventId: row.event_id ?? "",
             createdAt: row.created_at,
           };
 
-          // 自己エコーは基本ここで弾く（hookでも二重防御）
           if (env.clientId === this.clientId) return;
-
           cb(env);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[EV] channel status:", status, "name:", channelName);
+      });
 
     return () => {
+      console.log("[EV] unsubscribe", channelName);
       void this.client.removeChannel(channel);
     };
   }
+}
+
+function toNumberId(id: number | string): number {
+  // Supabase が int8 を string で返すことがあるので強制 number 化
+  // JSの安全整数を超えるほど増えない前提（通常の連番なら問題なし）
+  const n = typeof id === "number" ? id : Number(id);
+  if (!Number.isFinite(n)) return 0;
+  return n;
 }
 
 function cryptoRandom(): string {
@@ -109,7 +125,6 @@ function cryptoRandomUUID(): string {
   } catch {
     /* noop */
   }
-  // UUID形式でなくても一意ならDBユニーク制約で十分だが、念のためUUIDっぽく
   return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random()
     .toString(16)
     .slice(2)}`;
