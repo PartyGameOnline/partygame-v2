@@ -1,5 +1,10 @@
-import CounterView from "../../../games/counter/CounterView";
+import CounterView from "@/games/counter/CounterView";
 
-export default function CounterRoomPage({ params }: { params: { room: string } }) {
-  return <CounterView roomCode={params.room} />;
+type PageProps = {
+  params: Promise<{ room: string }>;
+};
+
+export default async function Page({ params }: PageProps) {
+  const { room } = await params;
+  return <CounterView roomCode={room} />;
 }
