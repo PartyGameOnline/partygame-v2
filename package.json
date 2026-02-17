@@ -79,15 +79,6 @@
   },
   "overrides": {
     "@eslint/core": "0.16.0",
-    "@eslint/plugin-kit": "0.4.0",
-    "@typescript-eslint/eslint-plugin": "8.45.0",
-    "@typescript-eslint/parser": "8.45.0",
-    "@typescript-eslint/project-service": "8.45.0",
-    "@typescript-eslint/scope-manager": "8.45.0",
-    "@typescript-eslint/tsconfig-utils": "8.45.0",
-    "@typescript-eslint/types": "8.45.0",
-    "@typescript-eslint/typescript-estree": "8.45.0",
-    "@typescript-eslint/utils": "8.45.0",
-    "@typescript-eslint/visitor-keys": "8.45.0"
+    "@eslint/plugin-kit": "0.4.0"
   }
 }
