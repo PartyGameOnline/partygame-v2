@@ -40,10 +40,10 @@
     "*.{js,ts,tsx,css,md,json}": "prettier --write"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.91.1",
+    "@supabase/supabase-js": "2.95.3",
     "next": "16.1.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@eslint/css": "^0.14.1",
@@ -53,7 +53,7 @@
     "@eslint/markdown": "^7.5.1",
     "@next/eslint-plugin-next": "16.1.6",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "25.1.0",
+    "@types/node": "25.2.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "8.45.0",
@@ -65,7 +65,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.0.1",
-    "globals": "16.4.0",
+    "globals": "17.3.0",
     "husky": "9.1.7",
     "license-checker-rseidelsohn": "4.4.2",
     "lint-staged": "^16.2.6",
@@ -79,15 +79,6 @@
   },
   "overrides": {
     "@eslint/core": "0.16.0",
-    "@eslint/plugin-kit": "0.4.0",
-    "@typescript-eslint/eslint-plugin": "8.45.0",
-    "@typescript-eslint/parser": "8.45.0",
-    "@typescript-eslint/project-service": "8.45.0",
-    "@typescript-eslint/scope-manager": "8.45.0",
-    "@typescript-eslint/tsconfig-utils": "8.45.0",
-    "@typescript-eslint/types": "8.45.0",
-    "@typescript-eslint/typescript-estree": "8.45.0",
-    "@typescript-eslint/utils": "8.45.0",
-    "@typescript-eslint/visitor-keys": "8.45.0"
+    "@eslint/plugin-kit": "0.4.0"
   }
 }
