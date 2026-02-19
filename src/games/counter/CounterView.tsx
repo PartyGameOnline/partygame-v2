@@ -36,10 +36,12 @@ function CounterRoom({ roomCode }: { roomCode: string }) {
   const push = (m: string) =>
     setLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${m}`]);
 
-  // adapter は「タブ単位で1個」でOK
-  const eventAdapter = useMemo(() => new SupabaseEventAdapter<CounterEvent>(supabase), []);
+  // ★統合ログ: room_events を使う（adapter側デフォルトもroom_eventsだが明示して事故防止）
+  const eventAdapter = useMemo(
+    () => new SupabaseEventAdapter<CounterEvent>(supabase, { table: "room_events" }),
+    []
+  );
 
-  // devtools から触れるように（PC検証用）
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     (window as any).supabase = supabase;
@@ -50,13 +52,14 @@ function CounterRoom({ roomCode }: { roomCode: string }) {
     push(`room = ${roomCode}`);
   }, [roomCode]);
 
-  // メイン：イベント同期（これがUIの数字を動かす）
   const { state, dispatch } = useGameEventSync<CounterState, CounterEvent>(counterSpec, {
     roomCode,
     adapter: eventAdapter,
+    // ignoreSelf=false前提なので optimisticはfalseのままでOK（subscribeで反映）
+    // optimistic: true にしたいなら adapterを ignoreSelf:true にする
   });
 
-  // ---- PROBE(1): adapter.subscribe(roomCode, filterあり) が動くか ----
+  // ---- PROBE(1): adapter.subscribe(roomCode, filterあり) ----
   const unsubFilteredRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     unsubFilteredRef.current?.();
@@ -80,17 +83,17 @@ function CounterRoom({ roomCode }: { roomCode: string }) {
     };
   }, [roomCode, eventAdapter]);
 
-  // ---- PROBE(2): filter無しで “全部” 受け取れるか（publication/権限の切り分け） ----
+  // ---- PROBE(2): filter無しで “全部” 受け取れるか（publication/権限切り分け） ----
   const unsubRawRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     unsubRawRef.current?.();
     push("[PROBE] raw subscribe(no filter) start");
 
     const ch = supabase
-      .channel("probe-game-events-all")
+      .channel("probe-room-events-all")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "game_events" },
+        { event: "INSERT", schema: "public", table: "room_events" },
         (payload) => {
           const row = payload.new as any;
           push(
@@ -141,7 +144,6 @@ function CounterUI(props: {
 }) {
   const { title, state, dispatch, log, roomCode } = props;
 
-  // hydration mismatch 回避（マウント後に描画）
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
