@@ -16,7 +16,7 @@ export interface SyncAdapter<S, _E> {
 }
 
 export type RemoteEventEnvelope<E> = {
-  id: number; // DBの連番
+  id: string; // ★ bigint安全のため string に統一（"0" 始まり）
   roomCode: string;
   event: E;
   clientId: string;
@@ -25,8 +25,24 @@ export type RemoteEventEnvelope<E> = {
 };
 
 export interface EventSyncAdapter<E> {
-  loadAfter(roomCode: string, afterId: number): Promise<RemoteEventEnvelope<E>[]>;
+  // ★ ページング対応（limitは実装側が上限を設定してもOK）
+  loadAfter(roomCode: string, afterId: string, limit?: number): Promise<RemoteEventEnvelope<E>[]>;
+
   publish(roomCode: string, event: E): Promise<void>;
+
   subscribe(roomCode: string, cb: (envelope: RemoteEventEnvelope<E>) => void): () => void;
+
   getClientId(): string;
+}
+
+export type Snapshot<S> = {
+  roomCode: string;
+  lastEventId: string; // bigint安全: string ("0"~)
+  state: S;
+  createdAt?: string;
+};
+
+export interface SnapshotAdapter<S> {
+  loadLatest(roomCode: string): Promise<Snapshot<S> | undefined>;
+  saveSnapshot(roomCode: string, lastEventId: string, state: S): Promise<void>;
 }
