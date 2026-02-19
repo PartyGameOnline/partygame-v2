@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EventSyncAdapter, RemoteEventEnvelope } from "../types";
 
 type Row = {
-  id: number | string; // bigint が文字列で来る可能性に対応
+  id: number | string; // bigint が文字列で来る可能性
   room_code: string;
   event: unknown;
   client_id: string;
@@ -10,30 +10,52 @@ type Row = {
   created_at?: string;
 };
 
+type SupabaseEventAdapterOpts = {
+  table?: string; // ★統合ログなら "room_events"
+  schema?: string; // default "public"
+  ignoreSelf?: boolean; // false推奨（整合性優先）
+};
+
 export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
   private readonly clientId: string;
+  private readonly table: string;
+  private readonly schema: string;
+  private readonly ignoreSelf: boolean;
 
-  constructor(private client: SupabaseClient) {
+  constructor(
+    private client: SupabaseClient,
+    opts: SupabaseEventAdapterOpts = {}
+  ) {
     this.clientId = cryptoRandom();
-    console.log("[EV] clientId:", this.clientId);
+    // ★デフォルトを room_events に変更（統合ログ前提）
+    this.table = opts.table ?? "room_events";
+    this.schema = opts.schema ?? "public";
+    this.ignoreSelf = opts.ignoreSelf ?? false;
+
+    console.log("[EV] clientId:", this.clientId, "table:", this.table);
   }
 
   getClientId(): string {
     return this.clientId;
   }
 
-  async loadAfter(roomCode: string, afterId: number): Promise<RemoteEventEnvelope<E>[]> {
+  async loadAfter(
+    roomCode: string,
+    afterId: string,
+    limit = 500
+  ): Promise<RemoteEventEnvelope<E>[]> {
     const { data, error } = await this.client
-      .from("game_events")
+      .from(this.table)
       .select("id, room_code, event, client_id, event_id, created_at")
       .eq("room_code", roomCode)
       .gt("id", afterId)
-      .order("id", { ascending: true });
+      .order("id", { ascending: true })
+      .limit(limit);
 
     if (error) throw error;
 
     return (data as Row[]).map((r) => ({
-      id: toNumberId(r.id),
+      id: toIdString(r.id),
       roomCode: r.room_code,
       event: r.event as E,
       clientId: r.client_id,
@@ -44,19 +66,21 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
 
   async publish(roomCode: string, event: E): Promise<void> {
     const eventId = cryptoRandomUUID();
-    const { error } = await this.client.from("game_events").insert({
-      room_code: roomCode,
-      event,
-      client_id: this.clientId,
-      event_id: eventId,
+
+    const { error } = await this.client.functions.invoke("publish_room_event", {
+      body: {
+        room_code: roomCode,
+        event,
+        client_id: this.clientId,
+        event_id: eventId,
+      },
     });
 
     if (error) throw error;
   }
 
   subscribe(roomCode: string, cb: (env: RemoteEventEnvelope<E>) => void): () => void {
-    // ★呼び出しごとにユニークな channel 名にする（同名衝突を避ける）
-    const channelName = `game_events:${roomCode}:${this.clientId}:${Date.now()}:${Math.random()
+    const channelName = `${this.table}:${roomCode}:${this.clientId}:${Date.now()}:${Math.random()
       .toString(36)
       .slice(2)}`;
 
@@ -66,18 +90,16 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
         "postgres_changes",
         {
           event: "INSERT",
-          schema: "public",
-          table: "game_events",
+          schema: this.schema,
+          table: this.table,
           filter: `room_code=eq.${roomCode}`,
         },
         (payload) => {
-          console.log("[EV] recv payload:", payload);
-
           const row = payload.new as Row | null;
           if (!row) return;
 
           const env: RemoteEventEnvelope<E> = {
-            id: toNumberId(row.id),
+            id: toIdString(row.id),
             roomCode: row.room_code,
             event: row.event as E,
             clientId: row.client_id,
@@ -85,7 +107,7 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
             createdAt: row.created_at,
           };
 
-          if (env.clientId === this.clientId) return;
+          if (this.ignoreSelf && env.clientId === this.clientId) return;
           cb(env);
         }
       )
@@ -94,18 +116,13 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
       });
 
     return () => {
-      console.log("[EV] unsubscribe", channelName);
       void this.client.removeChannel(channel);
     };
   }
 }
 
-function toNumberId(id: number | string): number {
-  // Supabase が int8 を string で返すことがあるので強制 number 化
-  // JSの安全整数を超えるほど増えない前提（通常の連番なら問題なし）
-  const n = typeof id === "number" ? id : Number(id);
-  if (!Number.isFinite(n)) return 0;
-  return n;
+function toIdString(id: number | string): string {
+  return typeof id === "string" ? id : String(id);
 }
 
 function cryptoRandom(): string {
