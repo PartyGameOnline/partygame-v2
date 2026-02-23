@@ -6,6 +6,7 @@ import { useGameEventSync } from "../../engine/useGameEventSync";
 import { SupabaseEventAdapter } from "../../engine/adapters/supabaseEvents";
 import { supabase } from "../../lib/supabaseClient";
 import { counterSpec, type CounterEvent, type CounterState } from "./spec";
+import { createSupabaseSnapshotAdapter } from "../../lib/game/SupabaseSnapshotAdapter"; // ★追加
 
 type Props = { roomCode?: string };
 
@@ -42,6 +43,12 @@ function CounterRoom({ roomCode }: { roomCode: string }) {
     []
   );
 
+  // ★ snapshotAdapter を注入（これが無いと skip: no adapter になる）
+  const snapshotAdapter = useMemo(() => {
+    const clientId = eventAdapter.getClientId();
+    return createSupabaseSnapshotAdapter<CounterState>(supabase, { clientId, version: 1 });
+  }, [eventAdapter]);
+
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     (window as any).supabase = supabase;
@@ -55,6 +62,11 @@ function CounterRoom({ roomCode }: { roomCode: string }) {
   const { state, dispatch } = useGameEventSync<CounterState, CounterEvent>(counterSpec, {
     roomCode,
     adapter: eventAdapter,
+
+    // ★追加：snapshot
+    snapshotAdapter,
+    snapshotEveryNEvents: 1, // 動作確認中は 1（確認後は 50 くらい推奨）
+
     // ignoreSelf=false前提なので optimisticはfalseのままでOK（subscribeで反映）
     // optimistic: true にしたいなら adapterを ignoreSelf:true にする
   });

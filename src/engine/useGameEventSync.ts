@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameEngine } from "./GameEngine";
 import type { EventSyncAdapter, GameSpec, RemoteEventEnvelope, SnapshotAdapter } from "./types";
 
+/** 開発時のみデバッグログを出す（本番は無音） */
+const DEBUG_SYNC = process.env.NODE_ENV !== "production";
+
 /** 重複排除用の簡易LRU Set */
 class LruSet {
   private map = new Map<string, true>();
@@ -49,12 +52,11 @@ type UseGameEventSyncOpts<E, S> = {
   /** catchUp 1回の最大件数（ページング単位） */
   pageLimit?: number;
 
-  /** ★ Snapshot対応（Room全体Stateを渡す想定） */
+  /** Snapshot対応（Room全体Stateを渡す想定） */
   snapshotAdapter?: SnapshotAdapter<S>;
 
   /**
-   * 暫定：クライアント側でNイベントごとにスナップショット保存
-   * 公開運用では最終的にサーバ側生成に寄せるのが理想。
+   * クライアント側でNイベントごとにスナップショット保存
    * 0 なら無効。
    */
   snapshotEveryNEvents?: number;
@@ -63,7 +65,6 @@ type UseGameEventSyncOpts<E, S> = {
 type DispatchResult = { published: true } | { published: false; reason: "no-room" };
 
 function toBig(id: string) {
-  // 未初期化対策："0" 推奨、空は 0 とみなす
   if (!id) return BigInt(0);
   return BigInt(id);
 }
@@ -77,7 +78,8 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
     optimistic = false,
     pageLimit = 500,
     snapshotAdapter,
-    snapshotEveryNEvents = 0,
+    // ★本番デフォルト：100
+    snapshotEveryNEvents = 100,
   } = opts;
 
   // spec固定前提（変更しない設計）
@@ -92,7 +94,7 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
   const seenRef = useRef(new LruSet(dedupeCapacity));
   const fetchingRef = useRef(false);
 
-  // スナップショット間引き用
+  // スナップショット間引き用（適用イベント数）
   const appliedCountRef = useRef(0);
 
   const clientId = useMemo(() => eventAdapter.getClientId(), [eventAdapter]);
@@ -106,12 +108,13 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
       if (!snapshotEveryNEvents || snapshotEveryNEvents <= 0) return;
 
       appliedCountRef.current++;
-      if (appliedCountRef.current % snapshotEveryNEvents !== 0) return;
+      const count = appliedCountRef.current;
 
-      // fire-and-forget（失敗しても同期は継続）
+      if (count % snapshotEveryNEvents !== 0) return;
+
       void snapshotAdapter
         .saveSnapshot(room, lastEventId, engine.getState() as S)
-        .catch(console.error);
+        .catch((e) => console.error("[snapshot] save failed", e));
     },
     [snapshotAdapter, snapshotEveryNEvents, engine]
   );
@@ -123,7 +126,7 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
       const envId = toBig(env.id);
       const lastId = toBig(lastIdRef.current);
 
-      // 古い/同じ id は捨てる
+      // 古い/同じ id は捨てる（dedupe目的でeventIdだけ記録）
       if (envId <= lastId) {
         seenRef.current.add(env.eventId);
         return;
@@ -134,10 +137,10 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
       lastIdRef.current = env.id;
       seenRef.current.add(env.eventId);
 
-      // snapshot（任意）
-      if (env.roomCode) maybeSaveSnapshot(env.roomCode, env.id);
+      // snapshot（保存先roomCodeはopts.roomCodeで固定）
+      if (roomCode) maybeSaveSnapshot(roomCode, env.id);
     },
-    [engine, maybeSaveSnapshot]
+    [engine, maybeSaveSnapshot, roomCode]
   );
 
   const catchUp = useCallback(
@@ -145,18 +148,14 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
       if (fetchingRef.current) return;
       fetchingRef.current = true;
       try {
-        // 追いつくまでページング
         while (true) {
           const after = lastIdRef.current;
           const list = await eventAdapter.loadAfter(room, after, pageLimit);
           if (list.length === 0) break;
 
-          // 念のためソート
           list.sort((a, b) => (toBig(a.id) < toBig(b.id) ? -1 : 1));
-
           for (const env of list) applyEnvelope(env);
 
-          // まだ pageLimit 件出ているなら続きがある可能性が高い
           if (list.length < pageLimit) break;
         }
       } finally {
@@ -183,6 +182,8 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
 
     (async () => {
       try {
+        if (DEBUG_SYNC) console.log("[sync] start", { roomCode, clientId });
+
         // 0) Snapshotがあれば先に復元（Room全体State）
         if (snapshotAdapter) {
           const snap = await snapshotAdapter.loadLatest(roomCode);
@@ -220,8 +221,10 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
 
         if (!alive) return;
         setHydrated(true);
+        if (DEBUG_SYNC)
+          console.log("[sync] hydrated", { roomCode, lastRemoteId: lastIdRef.current });
       } catch (e) {
-        console.error(e);
+        console.error("[sync] error", e);
         if (!alive) return;
         setHydrated(true);
       }
@@ -232,7 +235,16 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
       setHydrated(false);
       if (unsub) unsub();
     };
-  }, [roomCode, eventAdapter, snapshotAdapter, catchUp, applyEnvelope, initialAfterId, engine]);
+  }, [
+    roomCode,
+    eventAdapter,
+    snapshotAdapter,
+    catchUp,
+    applyEnvelope,
+    initialAfterId,
+    engine,
+    clientId,
+  ]);
 
   const dispatch = useCallback(
     async (event: E): Promise<DispatchResult> => {
