@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameEngine } from "./GameEngine";
+import { devLog as log, devError as error } from "./logger";
 import type { EventSyncAdapter, GameSpec, RemoteEventEnvelope, SnapshotAdapter } from "./types";
 
 /** 開発時のみデバッグログを出す（本番は無音） */
@@ -24,7 +25,8 @@ class LruSet {
     }
     this.map.set(k, true);
     if (this.map.size > this.capacity) {
-      const oldest = this.map.keys().next().value as string | undefined;
+      const it = this.map.keys().next();
+      const oldest = it.done ? undefined : it.value;
       if (oldest) this.map.delete(oldest);
     }
   }
@@ -60,6 +62,18 @@ type UseGameEventSyncOpts<E, S> = {
    * 0 なら無効。
    */
   snapshotEveryNEvents?: number;
+
+  /**
+   * snapshot保存を許可するか（未指定なら従来通り許可）
+   * host限定にしたい場合は呼び出し側で false を渡す、または canSaveSnapshotFn を使う。
+   */
+  canSaveSnapshot?: boolean;
+
+  /**
+   * 現在stateに基づいてsnapshot保存可否を判定する（未指定なら判定しない）
+   * true のときだけ保存される。
+   */
+  canSaveSnapshotFn?: (state: Readonly<S>) => boolean;
 };
 
 type DispatchResult = { published: true } | { published: false; reason: "no-room" };
@@ -80,6 +94,8 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
     snapshotAdapter,
     // ★本番デフォルト：100
     snapshotEveryNEvents = 100,
+    canSaveSnapshot,
+    canSaveSnapshotFn,
   } = opts;
 
   // spec固定前提（変更しない設計）
@@ -112,11 +128,19 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
 
       if (count % snapshotEveryNEvents !== 0) return;
 
+      // snapshot保存ガード（未指定なら従来通り保存）
+      if (canSaveSnapshot === false) return;
+
+      if (canSaveSnapshotFn) {
+        const s = engine.getState() as Readonly<S>;
+        if (!canSaveSnapshotFn(s)) return;
+      }
+
       void snapshotAdapter
         .saveSnapshot(room, lastEventId, engine.getState() as S)
-        .catch((e) => console.error("[snapshot] save failed", e));
+        .catch((e) => error("[snapshot] save failed", e));
     },
-    [snapshotAdapter, snapshotEveryNEvents, engine]
+    [snapshotAdapter, snapshotEveryNEvents, engine, canSaveSnapshot, canSaveSnapshotFn]
   );
 
   const applyEnvelope = useCallback(
@@ -182,7 +206,7 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
 
     (async () => {
       try {
-        if (DEBUG_SYNC) console.log("[sync] start", { roomCode, clientId });
+        if (DEBUG_SYNC) log("[sync] start", { roomCode, clientId });
 
         // 0) Snapshotがあれば先に復元（Room全体State）
         if (snapshotAdapter) {
@@ -221,10 +245,9 @@ export function useGameEventSync<S, E>(spec: GameSpec<S, E>, opts: UseGameEventS
 
         if (!alive) return;
         setHydrated(true);
-        if (DEBUG_SYNC)
-          console.log("[sync] hydrated", { roomCode, lastRemoteId: lastIdRef.current });
+        if (DEBUG_SYNC) log("[sync] hydrated", { roomCode, lastRemoteId: lastIdRef.current });
       } catch (e) {
-        console.error("[sync] error", e);
+        error("[sync] error", e);
         if (!alive) return;
         setHydrated(true);
       }

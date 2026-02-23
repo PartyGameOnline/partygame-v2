@@ -1,13 +1,11 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import type { EventSyncAdapter, SnapshotAdapter } from "../types";
+import type { EventSyncAdapter, SnapshotAdapter, GameSpec } from "../types";
 import { useGameEventSync } from "../useGameEventSync";
-import type { GameSpec } from "../types";
 import type { RoomEvent, RoomState } from "./types";
 import { createRoomSpec } from "./createRoomSpec";
-import type { ParticipantsState } from "../participants/types";
-import type { Participant } from "../participants/types";
+import type { ParticipantsState, Participant } from "../participants/types";
 
 type UseRoomOpts<G, GE> = {
   roomCode: string;
@@ -43,21 +41,29 @@ export function useRoom<G, GE>(gameSpec: GameSpec<G, GE>, opts: UseRoomOpts<G, G
     name,
     heartbeatMs = 8000,
     pageLimit = 500,
-    snapshotEveryNEvents = 0,
+    snapshotEveryNEvents = 5,
   } = opts;
 
   const roomSpec = useMemo(() => createRoomSpec<G, GE>(gameSpec), [gameSpec]);
 
-  const { state, dispatch, hydrated, clientId, lastRemoteId } = useGameEventSync<
-    RoomState<G>,
-    RoomEvent<GE>
-  >(roomSpec, {
-    roomCode,
-    adapter,
-    snapshotAdapter,
-    pageLimit,
-    snapshotEveryNEvents,
-  });
+  // ★ clientIdは adapter から先に確定（循環参照を避ける）
+  const localClientId = useMemo(() => adapter.getClientId(), [adapter]);
+
+  console.log("[room] clientId:", localClientId);
+
+  const { state, dispatch, hydrated, lastRemoteId } = useGameEventSync<RoomState<G>, RoomEvent<GE>>(
+    roomSpec,
+    {
+      roomCode,
+      adapter,
+      snapshotAdapter,
+      pageLimit,
+      snapshotEveryNEvents,
+
+      // ★host限定保存：participants.hostId === clientId のときだけ snapshot を保存する
+      canSaveSnapshotFn: (s) => (s as RoomState<G>).participants.hostId === localClientId,
+    }
+  );
 
   // participants操作は共通イベントとして流す（全部room_eventsに乗る）
   const dispatchParticipants = useCallback((ev: RoomEvent<GE>) => dispatch(ev), [dispatch]);
@@ -68,39 +74,35 @@ export function useRoom<G, GE>(gameSpec: GameSpec<G, GE>, opts: UseRoomOpts<G, G
   const participants = state.participants;
   const game = state.game;
 
-  const me = participants.byId[clientId] ?? null;
-  const isHost = participants.hostId === clientId;
+  const me = participants.byId[localClientId] ?? null;
+  const isHost = participants.hostId === localClientId;
 
   // アクション（参加者）
   const join = useCallback(() => {
     const at = Date.now();
     dispatch({ type: "room/open", roomCode, at });
-    dispatch({ type: "participants/join", id: clientId, name, at });
-  }, [dispatch, roomCode, clientId, name]);
+    dispatch({ type: "participants/join", id: localClientId, name, at });
+  }, [dispatch, roomCode, localClientId, name]);
 
   const leave = useCallback(() => {
-    dispatch({ type: "participants/leave", id: clientId, at: Date.now() });
-  }, [dispatch, clientId]);
+    dispatch({ type: "participants/leave", id: localClientId, at: Date.now() });
+  }, [dispatch, localClientId]);
 
   const heartbeat = useCallback(() => {
-    dispatch({ type: "participants/heartbeat", id: clientId, at: Date.now() });
-  }, [dispatch, clientId]);
+    dispatch({ type: "participants/heartbeat", id: localClientId, at: Date.now() });
+  }, [dispatch, localClientId]);
 
   const setReady = useCallback(
     (ready: boolean) =>
-      dispatch({ type: "participants/setReady", id: clientId, ready, at: Date.now() }),
-    [dispatch, clientId]
+      dispatch({ type: "participants/setReady", id: localClientId, ready, at: Date.now() }),
+    [dispatch, localClientId]
   );
 
   const setName = useCallback(
     (next: string) =>
-      dispatch({ type: "participants/setName", id: clientId, name: next, at: Date.now() }),
-    [dispatch, clientId]
+      dispatch({ type: "participants/setName", id: localClientId, name: next, at: Date.now() }),
+    [dispatch, localClientId]
   );
-
-  // heartbeatタイマー/auto join-leave は「ゲーム側でいつ開始するか」もあるので、
-  // 共通フックでは関数として提供し、呼び出し側で useEffect を書く方が自由度が高いです。
-  // (ここで勝手にjoinすると、ロビー/観戦などで困るため)
 
   return {
     hydrated,
@@ -112,7 +114,7 @@ export function useRoom<G, GE>(gameSpec: GameSpec<G, GE>, opts: UseRoomOpts<G, G
     participantsList: listParticipants(participants),
     me,
     isHost,
-    clientId,
+    clientId: localClientId,
 
     game,
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EventSyncAdapter, RemoteEventEnvelope } from "../types";
+import { devLog } from "../logger";
 
 type Row = {
   id: number | string; // bigint が文字列で来る可能性
@@ -32,7 +33,7 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
     this.schema = opts.schema ?? "public";
     this.ignoreSelf = opts.ignoreSelf ?? false;
 
-    console.log("[EV] clientId:", this.clientId, "table:", this.table);
+    devLog("[EV] clientId:", this.clientId, "table:", this.table);
   }
 
   getClientId(): string {
@@ -112,7 +113,7 @@ export class SupabaseEventAdapter<E> implements EventSyncAdapter<E> {
         }
       )
       .subscribe((status) => {
-        console.log("[EV] channel status:", status, "name:", channelName);
+        devLog("[EV] channel status:", status, "name:", channelName);
       });
 
     return () => {

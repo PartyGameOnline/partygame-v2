@@ -6,7 +6,7 @@ type ReqBody = {
   lastEventId: number; // room_events.id (bigint)
   state: unknown; // JSON serializable
   version?: number; // default 1
-  clientId: string; // who is updating snapshot (e.g., sessionId)
+  clientId: string; // who is updating snapshot (must be host client_id)
 };
 
 const corsHeaders = {
@@ -61,9 +61,25 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // ---- optional: authorization (host only etc.) ----
-    // 案Aの段階ではここは空でOK。
-    // 後で participants を参照して host 判定するならここに入れる。
+    // ---- authorization: host only ----
+    const { data: meta, error: metaErr } = await supabase
+      .from("room_meta")
+      .select("host_client_id")
+      .eq("room_code", body.roomCode)
+      .maybeSingle();
+
+    if (metaErr) {
+      return json(500, { error: `room_meta lookup failed: ${metaErr.message}` });
+    }
+
+    // room_meta が無い = host確定前。公開向けには安全側で拒否。
+    if (!meta?.host_client_id) {
+      return json(403, { error: "host_not_registered" });
+    }
+
+    if (meta.host_client_id !== body.clientId) {
+      return json(403, { error: "host_only" });
+    }
 
     const version = Number.isInteger(body.version) ? (body.version as number) : 1;
 

@@ -110,6 +110,22 @@ serve(async (req) => {
 
   if (upErr) return bad("rate_upsert_failed", 500, origin);
 
+  // ★ host初回登録（room_meta が無ければこの clientId を host として固定）
+  // 既に存在する場合は上書きしない（ignoreDuplicates）
+  const { error: hostErr } = await supabase.from("room_meta").upsert(
+    {
+      room_code: roomCode,
+      host_client_id: clientId,
+    },
+    {
+      onConflict: "room_code",
+      ignoreDuplicates: true,
+    }
+  );
+
+  if (hostErr) return bad("host_register_failed", 500, origin);
+
+  // イベントinsert
   const { error: insErr } = await supabase.from("room_events").insert({
     room_code: roomCode,
     event,
