@@ -38,7 +38,7 @@ jobs:
       # 1) Dependabot メタデータ取得（更新種別の判定用）
       - name: Fetch metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
